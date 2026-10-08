@@ -7,3 +7,6 @@ torchvision==0.26.0+cu129
 transformers>=5.5.3,<5.15
 gguf
 ninja
+
+# Text-only study: media decoding needs no CUDA and must not pull CUDA 13 binaries.
+https://download.pytorch.org/whl/cpu/torchcodec-0.14.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=0da64ee68e8103a28906e0950acc40e2501d81894c3cb2b17e461336c08ab42f

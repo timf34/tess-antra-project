@@ -16,3 +16,11 @@ remains to be verified.
 
 Sources: [vLLM release assets](https://github.com/vllm-project/vllm/releases/tag/v0.26.0)
 and [NVIDIA compatibility matrix](https://docs.nvidia.com/deploy/cuda-compatibility/forward-compatibility.html).
+
+The CUDA 12.9 runtime initialized and passed its GPU operation on the next run.
+Full vLLM entrypoint import then failed because its transitive TorchCodec wheel
+required `libnvrtc.so.13`. Generation still had not started. Pinning the official
+TorchCodec 0.14.0 CPU wheel avoids this unrelated CUDA 13 media dependency; the
+study uses text only. FFmpeg libraries are installed for its import, and the
+runtime check now imports the actual LLM entrypoint. Full traceback was retained
+privately. Pod restart was delayed by unavailable host GPU capacity.

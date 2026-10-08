@@ -35,6 +35,8 @@ for step in generate collect derive intervene; do
   python -m npbench.cli target "$step" --config "$CONFIG"
 done
 # Generation uses an explicit CUDA wheel; a torch index alone does not select vLLM's CUDA build.
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg
 python3 -m venv /es_venv
 /es_venv/bin/pip install --quiet --upgrade pip
 /es_venv/bin/pip install --quiet -r scripts/pod/requirements-generation.txt
@@ -55,6 +57,7 @@ cp -a /es_source/vllm/. "$VLLM_DIR/"
 /es_venv/bin/pip install --quiet -e .
 /es_venv/bin/python - <<'PY'
 import torch
+from vllm import LLM, SamplingParams  # Exercise media/dependency imports before loading weights.
 from vllm.steer_vectors import ApplySpec
 assert torch.cuda.is_available()
 assert torch.version.cuda == '12.9'
