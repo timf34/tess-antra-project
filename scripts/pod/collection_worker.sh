@@ -40,6 +40,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg
 python3 -m venv /es_venv
 /es_venv/bin/pip install --quiet --upgrade pip
 /es_venv/bin/pip install --quiet -r scripts/pod/requirements-generation.txt
+# Kernel compilation launches ninja by name in child processes.
+export PATH=/es_venv/bin:$PATH
+ninja --version
 # H200 / driver 570 supports NVIDIA's CUDA 12.9 forward-compatibility package,
 # including PTX JIT. Apply only to generation, leaving capture on its CUDA 12.8 runtime.
 driver_major=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1)

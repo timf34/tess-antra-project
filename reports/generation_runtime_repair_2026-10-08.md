@@ -24,3 +24,9 @@ TorchCodec 0.14.0 CPU wheel avoids this unrelated CUDA 13 media dependency; the
 study uses text only. FFmpeg libraries are installed for its import, and the
 runtime check now imports the actual LLM entrypoint. Full traceback was retained
 privately. Pod restart was delayed by unavailable host GPU capacity.
+
+The following attempt passed full imports and loaded the model, but kernel
+initialization could not find the installed `ninja` executable: the generation
+Python was invoked by absolute path without putting its environment's binaries
+on PATH. The worker now exports that path and verifies `ninja --version`. No
+attention backend, generation parameters, or research validation was changed.
