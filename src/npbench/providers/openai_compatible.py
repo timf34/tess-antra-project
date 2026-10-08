@@ -64,7 +64,7 @@ class OpenAICompatibleProvider(Provider):
         messages: list[dict[str, Any]] = []
         if req.system:
             messages.append({"role": "system", "content": req.system})
-        messages.extend(req.messages)
+        messages.extend(_convert_messages(req.messages))
         kwargs: dict[str, Any] = {"model": self.model_id, "messages": messages, "max_tokens": req.max_tokens}
         eff: dict[str, Any] = {"max_tokens": req.max_tokens}
         for k in ("temperature", "top_p", "seed"):
@@ -81,7 +81,17 @@ class OpenAICompatibleProvider(Provider):
             }
             eff["response_format"] = "json_schema"
         if req.tools:
-            kwargs["tools"] = req.tools
+            kwargs["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t.get("description", ""),
+                        "parameters": t["input_schema"],
+                    },
+                }
+                for t in req.tools
+            ]
         try:
             raw = self.client.chat.completions.with_raw_response.create(**kwargs)
             resp = raw.parse()
@@ -130,3 +140,39 @@ class OpenAICompatibleProvider(Provider):
         return ProviderResponse(
             text=text, content_blocks=blocks, stop_reason=stop, meta=meta, raw=resp.model_dump()
         )
+
+
+def _convert_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert provider-neutral (Anthropic-style) content blocks to chat-completions messages."""
+    out: list[dict[str, Any]] = []
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, str):
+            out.append({"role": m["role"], "content": content})
+            continue
+        if m["role"] == "assistant":
+            text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
+            calls = [
+                {
+                    "id": b["id"],
+                    "type": "function",
+                    "function": {"name": b["name"], "arguments": json.dumps(b.get("input", {}))},
+                }
+                for b in content
+                if b.get("type") == "tool_use"
+            ]
+            msg: dict[str, Any] = {"role": "assistant", "content": text or None}
+            if calls:
+                msg["tool_calls"] = calls
+            out.append(msg)
+        else:
+            texts = [b.get("text", "") for b in content if b.get("type") == "text"]
+            for b in content:
+                if b.get("type") == "tool_result":
+                    c = b.get("content")
+                    if isinstance(c, list):
+                        c = "".join(x.get("text", "") for x in c if isinstance(x, dict))
+                    out.append({"role": "tool", "tool_call_id": b["tool_use_id"], "content": str(c)})
+            if texts:
+                out.append({"role": "user", "content": "\n".join(texts)})
+    return out

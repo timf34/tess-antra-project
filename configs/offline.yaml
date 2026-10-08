@@ -16,7 +16,7 @@ evaluation:
   framings: [anonymized, revealed]
   repetitions: 1
   assistant_slots: [claude_a, claude_b, non_claude]
-  bundle_ids: [fixture_bundle_01]
+  bundle_ids: [fx_positive, fx_null, fx_sign_reversed, fx_confounded]
 providers:
   models:
     - { slot: claude_a, provider: fake, model_id: fake-claude-a }

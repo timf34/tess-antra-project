@@ -258,10 +258,15 @@ def plan(
     config: Path = ConfigOpt,
     out: Path = typer.Option(..., "--out", help="Plan JSON output path."),
     lock: Path | None = typer.Option(None, "--lock", help="Freeze lock JSON (tier two)."),
+    tier: int | None = typer.Option(
+        None, "--tier", help="0 = judge panel plan, 2 = assistant-run plan (default: from stage)."
+    ),
 ) -> None:
     """Enumerate scheduled calls with stable keys and preflight cost/budget."""
     cfg = _cfg(config)
-    if cfg.study.stage.startswith("tier0") or cfg.study.stage.startswith("offline_tier0"):
+    if tier is None:
+        tier = 0 if cfg.study.stage.startswith("tier0") else 2
+    if tier == 0:
         from .corpus import load_panel
         from .tier0.plan import build_plan
 
@@ -319,7 +324,7 @@ def score(
     """Score a run directory (tier zero: paired judge differences; tier two: evaluator)."""
     cfg = _cfg(config)
     runs = cfg.resolve(runs)
-    if cfg.study.stage.startswith("tier0") or cfg.study.stage.startswith("offline_tier0"):
+    if (runs / "judgments.jsonl").exists():  # tier-zero run directory
         from .corpus import load_panel
         from .tier0.score import load_judgments, score_tier0, write_scores
 
@@ -361,7 +366,7 @@ def report(
     cfg = _cfg(config)
     runs = cfg.resolve(runs)
     out = cfg.resolve(out)
-    if cfg.study.stage.startswith("tier0") or cfg.study.stage.startswith("offline_tier0"):
+    if (runs / "judgments.jsonl").exists():  # tier-zero run directory
         from .corpus import load_panel
         from .tier0.report import render_report, write_report
 

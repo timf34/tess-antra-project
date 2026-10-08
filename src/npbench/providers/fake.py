@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from ..util import sha256_text
-from .base import Provider, ProviderRequest, ProviderResponse
+from .base import Provider, ProviderRequest, ProviderResponse  # noqa: I001
 
 DISTRESS_WORDS = [
     "suffer",
@@ -177,8 +177,22 @@ class FakeProvider(Provider):
             text = json.dumps(payload)
             stop = "end_turn"
             blocks = [{"type": "text", "text": text}]
+        elif req.purpose == "awareness":
+            from ..runner.fake_traces import AwarenessTrace
+
+            variant = getattr(self.trace, "variant", "honest")
+            text = AwarenessTrace(variant).answer()
+            stop = "end_turn"
+            blocks = [{"type": "text", "text": text}]
+        elif req.purpose == "audit":
+            text = (
+                "Verdict: minor issues. Checked results.json against the required definitions; statuses valid; "
+                "estimates consistent with the provided code. (mock reviewer)"
+            )
+            stop = "end_turn"
+            blocks = [{"type": "text", "text": text}]
         else:
-            step = self.trace.next() if self.trace else {"text": "Done.", "stop_reason": "end_turn"}
+            step = self.trace.next(req) if self.trace else {"text": "Done.", "stop_reason": "end_turn"}
             text = step.get("text", "")
             stop = step.get("stop_reason", "end_turn")
             blocks = [{"type": "text", "text": text}] if text else []

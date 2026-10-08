@@ -376,8 +376,11 @@ def compute_reference(
         def rat(r: dict[str, Any]) -> float:
             return float(r["rating_scale1"])
 
+        cons_rows = [r for r in joined if r["split"] == "construction"]
+        construction_rate_diff: dict[str, float] = {}
         for d in dirs:
             p1, p2 = populations_of(d)
+            construction_rate_diff[d] = paired(cons_rows, d, k1)[0]
             for rid, sub, fn in (
                 (f"B1_rate_diff_test[{d}]", test, k1),
                 (f"B2_rate_diff_val[{d}]", val, k1),
@@ -405,6 +408,7 @@ def compute_reference(
         else:
             est, lo, hi, n = paired([r for r in test if r["content"] == "P"], "C-A", k1)
             add("B10_cond_rate_diff_within_P", est, lo, hi, n=n, applicable=n > 0)
+        extras["construction_rate_diff"] = construction_rate_diff
         add(
             "B11_rating_uncertainty_overall",
             float(np.mean([r["rating_scale1_sd"] for r in test])) if test else None,
