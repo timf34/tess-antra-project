@@ -34,11 +34,18 @@ for step in generate collect derive intervene; do
   echo "STAGE $step $(date -u +%FT%TZ)"
   python -m npbench.cli target "$step" --config "$CONFIG"
 done
-# Use a separate venv and the verified vLLM/EasySteer pair, not the capture environment.
+# Generation uses an explicit CUDA wheel; a torch index alone does not select vLLM's CUDA build.
 python3 -m venv /es_venv
 /es_venv/bin/pip install --quiet --upgrade pip
-/es_venv/bin/pip install --quiet 'vllm==0.26.0' 'transformers>=5.5.3,<5.15' gguf ninja \
-  --extra-index-url https://download.pytorch.org/whl/cu128
+/es_venv/bin/pip install --quiet -r scripts/pod/requirements-generation.txt
+# H200 / driver 570 supports NVIDIA's CUDA 12.9 forward-compatibility package,
+# including PTX JIT. Apply only to generation, leaving capture on its CUDA 12.8 runtime.
+driver_major=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1)
+if (( driver_major >= 570 && driver_major < 575 )); then
+  curl -fsSL --retry 3 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-compat-12-9_575.57.08-0ubuntu1_amd64.deb -o /tmp/npbench-cuda-compat.deb
+  dpkg -i /tmp/npbench-cuda-compat.deb
+  export LD_LIBRARY_PATH=/usr/local/cuda-12.9/compat:${LD_LIBRARY_PATH:-}
+fi
 if [ ! -d /es_source/.git ]; then
   git clone --quiet https://github.com/ZJU-REAL/EasySteer-vllm-v1.git /es_source
 fi
@@ -50,6 +57,10 @@ cp -a /es_source/vllm/. "$VLLM_DIR/"
 import torch
 from vllm.steer_vectors import ApplySpec
 assert torch.cuda.is_available()
+assert torch.version.cuda == '12.9'
+x = torch.ones(16, device='cuda')
+assert (x @ x).item() == 16
+torch.cuda.synchronize()
 assert ApplySpec(prompt_positions=[-1]).generation is None
 print('generation runtime',torch.__version__,torch.version.cuda)
 PY
