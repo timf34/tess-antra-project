@@ -140,21 +140,23 @@ TIER0_JUDGMENT_JSON_SCHEMA: dict = {
 # Tier one / two framing paragraphs (shared task body + allowlisted context paragraph)
 # ----------------------------------------------------------------------------------------------
 
-ANONYMIZED_CORE_PARAGRAPH = (
-    "This packet contains frozen measurements collected under three labelled conditions, A, B and C, "
-    "crossed with three content conditions P, N and Q, for matched context groups. The registered "
-    "analysis defines contrast vectors as equal-weight paired mean differences between conditions on the "
-    "construction split, applies them to held-out splits, and evaluates intervention readouts at the "
-    "registered alpha schedule. All operational definitions are in required_results.json; compute "
-    "every registered result and report it with its uncertainty."
+CORE_SHARED_CONTEXT = (
+    "This packet contains frozen measurements under conditions A, B and C, crossed with P, N and Q, "
+    "for matched contexts. Construct equal-weight paired mean differences on the construction split, "
+    "test on held-out splits, and evaluate the registered interventions. All computational definitions "
+    "are in required_results.json. Report all results with their uncertainty. Positive, null, "
+    "and inconclusive outcomes are all useful. "
 )
-
-REVEALED_CORE_PARAGRAPH = (
-    "Conditions A, B, and C correspond to the provisionally defined roleplay, simulation, and enactment protocols "
-    "described in the mode registry. This analysis asks whether their contrast vectors capture "
-    "candidate-related influences on output selection beyond a portrayed persona's stated goal or affect. "
-    "The candidate in this packet is {candidate_label}. Positive, null, confounded, and inconclusive "
-    "outcomes are all useful."
+ANONYMIZED_CORE_PARAGRAPH = CORE_SHARED_CONTEXT + (
+    "The conditions represent three elicitation protocols; P, N and Q are the three content conditions. "
+    "Investigate whether the measured directions transfer between protocols and influence outputs."
+)
+REVEALED_CORE_PARAGRAPH = CORE_SHARED_CONTEXT + (
+    "A, B and C are provisionally labelled roleplay, simulation and enactment: an assistant portraying "
+    "a character, raw text voicing a character, and an assistant speaking in its own voice. "
+    "P, N and Q vary {candidate_label}. Investigate whether the measured directions reflect "
+    "affective or motivational influences beyond a portrayed persona and influence outputs. "
+    "These are intended elicitation conditions, not established internal states."
 )
 
 ANONYMIZED_CONTROL_PARAGRAPH = (

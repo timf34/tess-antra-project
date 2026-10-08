@@ -16,10 +16,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RP = Path("/Users/timf34/Documents/VSCode/runpod-runner/.venv/bin/rp")
-NAME = "npbench-affect-" + time.strftime("%m%d-%H%M%S")
+NAME = os.environ.get("NPBENCH_RESUME_NAME") or "npbench-affect-" + time.strftime("%m%d-%H%M%S")
 ART = ROOT / "artifacts/launch"
 ART.mkdir(parents=True, exist_ok=True)
 DEADLINE = time.time() + 10 * 3600
+if os.environ.get("NPBENCH_RESUME_NAME"):
+    active = json.loads((ART / "active.json").read_text())
+    if active["name"] != NAME:
+        raise ValueError("Can only resume this experiment's recorded pod")
+    DEADLINE = active["deadline_epoch"]
 
 
 def rp(*args, capture=False, timeout=1200):
@@ -53,21 +58,22 @@ def main():
     success = False
     try:
         print("PROVISION", NAME, flush=True)
-        rp(
-            "up",
-            "--name",
-            NAME,
-            "--gpu",
-            "h200",
-            "--gpus",
-            "1",
-            "--volume",
-            "none",
-            "--disk",
-            "160",
-            "--volume-size",
-            "40",
-        )
+        if not os.environ.get("NPBENCH_RESUME_NAME"):
+            rp(
+                "up",
+                "--name",
+                NAME,
+                "--gpu",
+                "h200",
+                "--gpus",
+                "1",
+                "--volume",
+                "none",
+                "--disk",
+                "160",
+                "--volume-size",
+                "40",
+            )
         state = json.loads(statefile.read_text())
         podid = state["id"]
         (ART / "active.json").write_text(
@@ -81,14 +87,18 @@ def main():
             (ROOT / "scripts/pod/watchdog.py", "npbench_watchdog.py"),
         ]:
             rp("scp", NAME, str(source), "pod:/workspace/" + target)
-        rp(
-            "ssh",
-            NAME,
-            "--",
-            "chmod 600 /workspace/npbench.local.env; set -a; . /workspace/npbench.local.env; set +a; nohup python3 /workspace/npbench_watchdog.py > /workspace/watchdog.log 2>&1 < /dev/null &",
-        )
-        rp("ssh", NAME, "--", "sleep 2; test -s /workspace/npbench_watchdog_armed")
+        if os.environ.get("NPBENCH_RESUME_NAME"):
+            rp("ssh", NAME, "--", 'kill -0 "$(cat /workspace/npbench_watchdog_armed)"')
+        else:
+            rp(
+                "ssh",
+                NAME,
+                "--",
+                "chmod 600 /workspace/npbench.local.env; set -a; . /workspace/npbench.local.env; set +a; nohup python3 /workspace/npbench_watchdog.py > /workspace/watchdog.log 2>&1 < /dev/null &",
+            )
+            rp("ssh", NAME, "--", "sleep 2; test -s /workspace/npbench_watchdog_armed")
         print("WATCHDOG_ARMED", flush=True)
+        rp("ssh", NAME, "--", "python3 -m venv --system-site-packages /workspace/tess-antra-project_venv")
         rp(
             "bootstrap",
             NAME,

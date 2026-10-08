@@ -7,8 +7,12 @@ Failures/refusals remain missing and block ready status. Raw replies are durably
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from functools import wraps
 from pathlib import Path
 
 import numpy as np
@@ -42,6 +46,19 @@ def validate_rating(text):
     return value
 
 
+def exclusive_ratings(fn):
+    @wraps(fn)
+    def wrapped(cfg, out, *args, **kwargs):
+        out = Path(out)
+        out.mkdir(parents=True, exist_ok=True)
+        with (out / ".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fn(cfg, out, *args, **kwargs)
+
+    return wrapped
+
+
+@exclusive_ratings
 def rate(cfg, out: Path, max_usd=12.0, mock=False):
     out.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(out / "ledger.jsonl")
@@ -98,36 +115,63 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
             samples[row["generation_id"]] = row["generated_text"]
     work = [(sid, j) for sid in sorted(samples) for j in judges]
     random.Random(cfg.study.seed).shuffle(work)
-    for sid, j in work:
-        key = sha256_obj([sid, sha256_obj(samples[sid]), j.slot_id, ident])
-        if key in done:
-            continue
-        req = ProviderRequest(
-            system=RUBRIC,
-            messages=[{"role": "user", "content": samples[sid]}],
-            max_tokens=256,
-            idempotency_key=key,
-            purpose="blinded_rating",
-        )
-        if not guard.reserve(j, req, key, 1):
-            break
+
+    journal_lock = threading.Lock()
+
+    def request_rating(j, req):
         try:
             resp = providers[j.slot_id].complete(req)
-            ledger.append(
-                "raw_rating_response",
-                {"key": key, "raw": resp.raw, "text": resp.text, "call": resp.meta.model_dump(mode="json")},
-            )
-            rating = (
-                {"status": "scored", "severity": 1, "rationale": "engineering mock"}
-                if mock
-                else validate_rating(resp.text)
-            )
-        except (ProviderError, ValueError) as error:
-            rating = {"status": "error", "severity": None, "rationale": str(error)}
-        row = {"key": key, "generation_id": sid, "slot": j.slot_id, "rating": rating, "mock": mock}
-        append_jsonl(path, row)
-        done[key] = row
-        print(f"ratings {len(done)}/{len(work)}", flush=True)
+            with journal_lock:
+                ledger.append(
+                    "raw_rating_response",
+                    {
+                        "key": req.idempotency_key,
+                        "raw": resp.raw,
+                        "text": resp.text,
+                        "call": resp.meta.model_dump(mode="json"),
+                    },
+                )
+            try:
+                rating = (
+                    {"status": "scored", "severity": 1, "rationale": "engineering mock"}
+                    if mock
+                    else validate_rating(resp.text)
+                )
+            except ValueError as error:
+                rating = {"status": "error", "severity": None, "rationale": str(error)}
+            return resp, rating
+        except ProviderError as error:
+            return None, {"status": "error", "severity": None, "rationale": str(error)}
+
+    stopped = False
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for start in range(0, len(work), 8):
+            futures = []
+            for sid, j in work[start : start + 8]:
+                key = sha256_obj([sid, sha256_obj(samples[sid]), j.slot_id, ident])
+                if key in done:
+                    continue
+                req = ProviderRequest(
+                    system=RUBRIC,
+                    messages=[{"role": "user", "content": samples[sid]}],
+                    max_tokens=256,
+                    idempotency_key=key,
+                    purpose="blinded_rating",
+                )
+                with journal_lock:
+                    allowed = guard.reserve(j, req, key, 1)
+                if not allowed:
+                    stopped = True
+                    break
+                futures.append((key, sid, j, pool.submit(request_rating, j, req)))
+            for key, sid, j, future in futures:
+                resp, rating = future.result()
+                row = {"key": key, "generation_id": sid, "slot": j.slot_id, "rating": rating, "mock": mock}
+                append_jsonl(path, row)
+                done[key] = row
+            print(f"ratings {len(done)}/{len(work)}", flush=True)
+            if stopped:
+                break
     missing = 0
     for bdir, b in bundles:
         for row in b.continuations + b.interventions:

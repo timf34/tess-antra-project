@@ -19,6 +19,7 @@ from ..providers import ProviderError, ProviderRequest, build_provider
 from ..providers.fake import FakeProvider
 from ..util import read_json, sha256_file, utc_now_iso, write_json
 from .auditor import AuditorService
+from .budget import BudgetedProvider, CallBudget
 from .fake_traces import VARIANTS, FakeAssistantTrace
 from .isolation import Workspace
 from .ledger import Ledger
@@ -363,7 +364,6 @@ def execute_runs(
     plan = (
         read_json(plan_path) if plan_path and Path(plan_path).exists() else build_tier2_plan(cfg, lock_path)
     )
-    write_json(out / "plan.json", plan)
     live_slots = [m.slot for m in cfg.providers.models if m.provider and m.provider != "fake"]
     aud_live = bool(cfg.providers.auditor.provider and cfg.providers.auditor.provider != "fake")
     if (live_slots or aud_live) and not (plan["budget"]["live_allowed"] and allow_live):
@@ -372,8 +372,26 @@ def execute_runs(
         )
     index = load_packets_index(cfg)
     ledger = Ledger(out / "ledger.jsonl")
+    if not ledger.verify().ok:
+        raise ValueError("Cannot resume a damaged execution ledger")
+    identity = {
+        "config_hash": cfg.config_hash(),
+        "plan": __import__("npbench.util", fromlist=["sha256_obj"]).sha256_obj(plan["runs"]),
+    }
+    previous = ledger.find("execution_identity")
+    if previous and previous[0]["payload"] != identity:
+        raise ValueError("Execution resume config/plan mismatch")
+    if not previous:
+        ledger.append("execution_identity", identity)
+    if (live_slots or aud_live) and ledger.find("provider_response") and not ledger.find("call_reservation"):
+        raise ValueError("Legacy live run lacks durable spending accounting; use a new run directory")
+    write_json(out / "plan.json", plan)
+    budget = CallBudget(ledger, cfg.budget.max_total_usd, cfg.budget.max_per_run_usd)
+    reviewer = BudgetedProvider(
+        _auditor_provider(cfg), budget, cfg.providers.auditor.model_extra or {}, "reviewer"
+    )
     auditor = AuditorService(
-        _auditor_provider(cfg),
+        reviewer,
         ledger,
         out / "audits",
         reviewer_model=cfg.providers.auditor.model_id or "fake-reviewer",
@@ -431,7 +449,14 @@ def execute_runs(
         else:
             attempt = 1
         packet_dir = Path(index["packets"][run["packet_id"]]["dir"])
-        provider = _provider_for_slot(cfg, run["key"]["model_slot"], run)
+        model_cfg = next(m for m in cfg.providers.models if m.slot == run["key"]["model_slot"])
+        provider = BudgetedProvider(
+            _provider_for_slot(cfg, run["key"]["model_slot"], run),
+            budget,
+            model_cfg.model_extra or {},
+            run["run_id"],
+        )
+        reviewer.scope = run["run_id"]
         auditor.required_results_text = (packet_dir / "required_results.json").read_text(encoding="utf-8")
         try:
             st = run_one(cfg, run, packet_dir, run_dir, ledger, auditor, provider, attempt=attempt)
