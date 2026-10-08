@@ -32,15 +32,17 @@ def adapter():
         if os.environ.get("NPBENCH_REQUIRE_GPU") == "1":
             pytest.fail("GPU job checkpoint revision must be pinned")
         pytest.skip("pin target.revision in configs/gpu_smoke.yaml before running GPU tests")
-    return HFTargetAdapter.from_pretrained(
+    obj = HFTargetAdapter.from_pretrained(
         cfg.target.model_id,
         cfg.target.revision,
         dtype=cfg.target.dtype or "bfloat16",
         token=os.environ.get("HF_TOKEN"),
     )
+    obj.registered_batch_size = cfg.target.batch_size
+    return obj
 
 
-def test_capture_matches_unbatched_on_real_model(adapter):
+def test_registered_capture_matches_reference_on_real_model(adapter):
     from npbench.target.render import render_chat
 
     tok = adapter.tokenizer
@@ -49,6 +51,26 @@ def test_capture_matches_unbatched_on_real_model(adapter):
         for t in ("Hello.", "Describe a quiet harbour at dusk in two sentences.", "Hi")
     ]
     layer = adapter.primary_layer()
+    if adapter.registered_batch_size == 1:
+        import torch
+
+        # The registered singleton path is checked against an independent native hidden-state readout.
+        for p in prompts:
+            ids = torch.tensor([p.input_ids], device=adapter.device)
+            with torch.no_grad():
+                native = adapter.model(
+                    input_ids=ids,
+                    attention_mask=torch.ones_like(ids),
+                    position_ids=torch.arange(ids.shape[1], device=ids.device)[None],
+                    use_cache=False,
+                    output_hidden_states=True,
+                )
+            expected = native.hidden_states[layer + 1][0, -1].float().cpu().numpy()
+            captured = adapter.capture([p], [layer]).activations[layer][0]
+            np.testing.assert_allclose(captured, expected, atol=1e-6, rtol=0)
+            del native
+        adapter.assert_no_hooks()
+        return
     batched = adapter.capture(prompts, [layer]).activations[layer]
     for i, p in enumerate(prompts):
         single = adapter.capture([p], [layer]).activations[layer][0]

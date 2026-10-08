@@ -28,12 +28,10 @@ class CallBudget:
     def reserve(self, scope, usd):
         with self.lock:
             scope_spent = sum(v for k, v in self.amounts.values() if k == scope)
-            if (
-                self.cap is None
-                or self.spent + usd > self.cap
-                or (self.per_run_cap is not None and scope_spent + usd > self.per_run_cap)
-            ):
-                raise ProviderError("API spending cap reached", kind="budget", retryable=False)
+            if self.cap is None or self.spent + usd > self.cap:
+                raise ProviderError("Study API spending cap reached", kind="budget_study", retryable=False)
+            if self.per_run_cap is not None and scope_spent + usd > self.per_run_cap:
+                raise ProviderError("Run API spending cap reached", kind="budget_run", retryable=False)
             call_id = f"call_{len(self.amounts)}"
             self.ledger.append("call_reservation", {"call_id": call_id, "scope": scope, "usd": usd})
             self.amounts[call_id] = (scope, usd)

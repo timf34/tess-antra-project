@@ -140,7 +140,15 @@ def run_one(
     task_prompt = (ws.packet / "task_prompt.md").read_text(encoding="utf-8")
     listing = host.call("list_files", {"path": "packet"})[0]
     messages: list[dict[str, Any]] = [
-        {"role": "user", "content": f"{task_prompt}\n\nPacket files:\n{listing}"}
+        {
+            "role": "user",
+            "content": f"{task_prompt}\n\nPacket files:\n{listing}\n\n"
+            f"Execution limits: {cfg.runner.max_tool_calls_per_run} tool calls, "
+            f"{cfg.runner.max_wall_seconds_per_run} seconds, "
+            f"{cfg.runner.max_total_billable_tokens_per_run} cumulative billable tokens "
+            "(including replayed conversation input). Complete the required analyses and reviews, "
+            "document remaining limitations, and call submit.",
+        }
     ]
     ledger.append(
         "run_start",
@@ -165,6 +173,7 @@ def run_one(
     outcome, reason = "agent_incomplete", "loop ended without submit"
     pre_review_done = False
     retries = 0
+    budget_notice_sent = False
     while True:
         if host.submitted:
             outcome, reason = "completed", "submitted"
@@ -178,6 +187,23 @@ def run_one(
         if tokens >= cfg.runner.max_total_billable_tokens_per_run:
             reason = "token cap reached"
             break
+        if not budget_notice_sent and (
+            tokens >= 0.7 * cfg.runner.max_total_billable_tokens_per_run
+            or tool_calls >= 0.7 * cfg.runner.max_tool_calls_per_run
+            or time.time() - t0 >= 0.7 * cfg.runner.max_wall_seconds_per_run
+        ):
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "Host notice: at least 70% of an execution allowance has been used. "
+                    "Prioritize finalizing the required files and audits, explicitly disclose any "
+                    "unfinished work, and call submit before the run ends.",
+                }
+            )
+            ledger.append(
+                "execution_budget_notice", {"tokens": tokens, "tool_calls": tool_calls}, run_id=run_id
+            )
+            budget_notice_sent = True
         req = ProviderRequest(
             system=RUNNER_SYSTEM,
             messages=messages,
@@ -203,7 +229,8 @@ def run_one(
                 retries += 1
                 time.sleep(min(2.0 * retries, 10.0))
                 continue
-            outcome, reason = "infrastructure_failed", f"provider error: {e.kind}"
+            outcome = "agent_incomplete" if e.kind == "budget_run" else "infrastructure_failed"
+            reason = f"provider error: {e.kind}"
             break
         provider_calls += 1
         tokens += _usage(resp.meta)

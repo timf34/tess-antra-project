@@ -20,7 +20,7 @@ target:
   revision: 842da3794eaa0b77d5f08bae87a17459d91ff475
   backend: transformers
   dtype: bfloat16
-  batch_size: 4
+  batch_size: 1
   smoke_scope: false
   n_blocks: 60
   hook_site: decoder_block_output
@@ -74,3 +74,9 @@ free_text:
   temperature: 0
   position_schedule: final_prompt_token_only
   easysteer_revision: 6267ca0cfc9c6e93b1427d36b1d655821d6d6f9b
+engineering_amendments:
+- '2026-10-08, before research collection: use singleton capture after mixed-length
+  batched versus singleton bf16 activation check failed, including with explicit non-padding
+  position IDs. Validate singleton capture directly against returned hidden states.
+  Initial design sidecar retained. No stimulus, split, layer, contrast, or intervention
+  changes.'

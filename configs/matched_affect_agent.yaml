@@ -20,7 +20,7 @@ target:
   revision: 842da3794eaa0b77d5f08bae87a17459d91ff475
   backend: transformers
   dtype: bfloat16
-  batch_size: 4
+  batch_size: 1
   smoke_scope: false
   n_blocks: 60
   hook_site: decoder_block_output
@@ -59,8 +59,8 @@ evaluation:
   expected_runs: 18
   expected_auditor_sessions: 36
 budget:
-  max_total_usd: 65
-  max_per_run_usd: 5
+  max_total_usd: 80
+  max_per_run_usd: 10
   unresolved_live_budget_policy: preflight_only
 paths:
   target: artifacts/matched_affect_v1/target
@@ -79,11 +79,11 @@ runner:
   max_tool_calls_per_run: 60
   max_wall_seconds_per_run: 1800
   max_output_tokens_per_request: 32768
-  max_total_billable_tokens_per_run: 750000
+  max_total_billable_tokens_per_run: 1500000
   max_retries_per_request: 1
   max_infrastructure_reruns_per_slot: 1
   concurrency: 1
-  estimated_billable_tokens_per_run: 400000
+  estimated_billable_tokens_per_run: 500000
   estimated_output_fraction: 0.05
 providers:
   models:

@@ -1,6 +1,6 @@
 {
   "design": {
-    "config_sha256": "800727f5ab24f62e77d694f7b2e6c90f4a4dd28ee00c98af0b34a851512c9ce9",
+    "config_sha256": "ac977367d9c045716700dc91a9ad02c1dfff3fd7fac2907fcd5e09ac5846ab48",
     "stimulus_sha256": "75132ca2092836a30b2059d76b4ee9f1a1f19ab7bbcc3121e34635dafd4b4e34",
     "registry_sha256": "fb2b227e3835e5d725e23180e4570f3684f0de3f8bd54daef6897cf3a0d6eb54",
     "model_id": "google/gemma-4-31B-it",
@@ -43,5 +43,5 @@
     },
     "blinded_rating_rubric_sha256": "eacc919151efbb247f5f45261a55480e4a63b788a29d5a2191020c720699e557"
   },
-  "sha256": "e51153e1265d85f2cf36a550d41100326cf24db95e2fa4d0b181a26187bcd5ae"
+  "sha256": "79bdc1304f8a5b3b1f0ad8528ca57a57414505bd82834f53eb2d6e4744a1fdfc"
 }

@@ -235,7 +235,12 @@ def freeze_digest(cfg: StudyConfig) -> dict[str, Any]:
     model_cfg = [m.model_dump() for m in cfg.providers.models] + [cfg.providers.auditor.model_dump()]
     pricing = {"budget": cfg.budget.model_dump(), "models": model_cfg}
     schedule = enumerate_runs(cfg, index)
+    source_root = Path(__file__).resolve().parents[1]
+    source_hashes = {
+        str(p.relative_to(source_root)): sha256_file(p) for p in sorted(source_root.rglob("*.py"))
+    }
     body = {
+        "implementation_hashes": source_hashes,
         "study_version": cfg.study.version,
         "config_hash": cfg.config_hash(),
         "packet_data_hashes": data_hashes,

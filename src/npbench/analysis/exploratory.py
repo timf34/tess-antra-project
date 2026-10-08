@@ -7,6 +7,7 @@ independent target investigations. Infrastructure missingness remains explicit.
 from __future__ import annotations
 
 import argparse
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -66,6 +67,9 @@ def build(runs: Path):
             }
         )
     ledger = Ledger(runs / "ledger.jsonl")
+    returned = [e["payload"] for e in ledger.find("provider_raw")]
+    costs = [(e.get("raw", {}).get("usage") or {}).get("cost") for e in returned]
+    valid_costs = [v for v in costs if type(v) in (int, float) and math.isfinite(v) and v >= 0]
     return dict(
         origins=scores["origins"],
         stage=scores["stage"],
@@ -74,6 +78,10 @@ def build(runs: Path):
         paired=paired_rows(scores["runs"]),
         runs=details,
         accounted_api_usd=CallBudget(ledger, None).spent,
+        provider_reported_api_usd=sum(valid_costs) if valid_costs else None,
+        calls_with_provider_cost=len(valid_costs),
+        calls_without_provider_cost=len(costs) - len(valid_costs),
+        unanswered_reservations=len(ledger.find("call_reservation")) - len(returned),
         cost_note="Observed token costs for settled calls; conservative reservations for unresolved calls.",
     )
 
