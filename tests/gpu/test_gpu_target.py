@@ -52,7 +52,11 @@ def test_capture_matches_unbatched_on_real_model(adapter):
     batched = adapter.capture(prompts, [layer]).activations[layer]
     for i, p in enumerate(prompts):
         single = adapter.capture([p], [layer]).activations[layer][0]
-        assert np.allclose(batched[i], single, atol=2e-2, rtol=1e-2)  # bf16 tolerance
+        assert np.allclose(batched[i], single, atol=2e-2, rtol=1e-2), {
+            "prompt": i,
+            "max_abs": float(np.max(np.abs(batched[i] - single))),
+            "relative_l2": float(np.linalg.norm(batched[i] - single) / np.linalg.norm(single)),
+        }  # bf16 tolerance
     adapter.assert_no_hooks()
 
 

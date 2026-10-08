@@ -2,7 +2,7 @@ schema_version: 2
 status: authorized_exploration
 study:
   stage: engineering_smoke
-  version: agent_engineering_smoke_v3
+  version: agent_engineering_smoke_v4
   seed: 20261008
 mode_definitions:
   status: pending_source_confirmation
@@ -76,10 +76,12 @@ runner:
   max_tool_calls_per_run: 60
   max_wall_seconds_per_run: 900
   max_output_tokens_per_request: 32768
-  max_total_billable_tokens_per_run: 400000
+  max_total_billable_tokens_per_run: 750000
   max_retries_per_request: 1
   max_infrastructure_reruns_per_slot: 1
   concurrency: 1
+  estimated_billable_tokens_per_run: 400000
+  estimated_output_fraction: 0.05
 providers:
   models:
   - slot: claude_b
@@ -96,6 +98,6 @@ providers:
     base_url: https://openrouter.ai/api/v1
     api_key_env: OPENROUTER_API_KEY
     settings:
-      max_tokens: 2000
+      max_tokens: 16384
     price_usd_per_m_input: 2.0
     price_usd_per_m_output: 10.0

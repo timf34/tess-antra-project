@@ -349,6 +349,7 @@ class HFTargetAdapter:
             return self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
+                position_ids=(attention_mask.long().cumsum(-1) - 1).masked_fill(attention_mask == 0, 0),
                 use_cache=False,
                 logits_to_keep=logits_to_keep,
             )
@@ -691,6 +692,7 @@ class HFTargetAdapter:
             "torch_version": self.torch_version,
             "device": str(self.device),
             "padding_side": self.tokenizer.padding_side,
+            "position_ids": "zero_based_nonpadding_token_index",
             "tokenizer_revision": tokenizer_revision_string(self.tokenizer, self.revision),
             "capture_position": CAPTURE_POSITION,
             "use_cache": False,

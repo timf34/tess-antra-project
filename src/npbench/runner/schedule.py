@@ -91,9 +91,21 @@ def enumerate_runs(cfg: StudyConfig, index: dict[str, Any]) -> list[dict[str, An
 
 def estimate_tier2_cost(cfg: StudyConfig, n_runs: int) -> dict[str, Any]:
     prices = {m.slot: m for m in cfg.providers.models}
-    per_run_tokens = cfg.runner.max_total_billable_tokens_per_run
-    reviewer_tokens = 2 * 12_000  # two review sessions, conservative
-    awareness_tokens = 3_000
+    estimates = cfg.runner.model_extra or {}
+    per_run_tokens = int(
+        estimates.get("estimated_billable_tokens_per_run", cfg.runner.max_total_billable_tokens_per_run)
+    )
+    output_fraction = float(estimates.get("estimated_output_fraction", 0.3))
+    if (
+        not 0 <= output_fraction <= 1
+        or not 0 < per_run_tokens <= cfg.runner.max_total_billable_tokens_per_run
+    ):
+        raise ValueError("Invalid preflight token estimate")
+    aud_settings = (cfg.providers.auditor.model_extra or {}).get("settings", {})
+    reviewer_input = 2 * 32_000
+    reviewer_output = 2 * int(aud_settings.get("max_tokens", 4000))
+    reviewer_tokens = reviewer_input + reviewer_output
+    awareness_tokens = 32_000
     retry_allowance = 1.25
     per_slot: dict[str, Any] = {}
     total = 0.0
@@ -112,9 +124,9 @@ def estimate_tier2_cost(cfg: StudyConfig, n_runs: int) -> dict[str, Any]:
             unpriced.append(slot)
             per_slot[slot] = {"runs": runs_per_slot, "usd": None, "mock": False}
             continue
-        usd_run = (0.7 * per_run_tokens * pin + 0.3 * per_run_tokens * pout) / 1e6 + (
-            0.8 * awareness_tokens * pin + 0.2 * awareness_tokens * pout
-        ) / 1e6
+        usd_run = (
+            (1 - output_fraction) * per_run_tokens * pin + output_fraction * per_run_tokens * pout
+        ) / 1e6 + (awareness_tokens * pin + 800 * pout) / 1e6
         per_slot[slot] = {
             "runs": runs_per_slot,
             "usd_per_run": round(usd_run, 4),
@@ -131,7 +143,7 @@ def estimate_tier2_cost(cfg: StudyConfig, n_runs: int) -> dict[str, Any]:
         if pin is None or pout is None:
             unpriced.append("auditor")
         else:
-            aud_cost = n_runs * (0.85 * reviewer_tokens * pin + 0.15 * reviewer_tokens * pout) / 1e6
+            aud_cost = n_runs * (reviewer_input * pin + reviewer_output * pout) / 1e6
             total += aud_cost
     return {
         "per_slot": per_slot,
@@ -144,10 +156,11 @@ def estimate_tier2_cost(cfg: StudyConfig, n_runs: int) -> dict[str, Any]:
         "unpriced": unpriced,
         "any_live": any_live,
         "assumptions": {
-            "tokens_per_run_cap": per_run_tokens,
+            "tokens_per_run_cap": cfg.runner.max_total_billable_tokens_per_run,
+            "estimated_tokens_per_run": per_run_tokens,
             "reviewer_tokens_per_run": reviewer_tokens,
             "awareness_tokens": awareness_tokens,
-            "input_output_split": "70/30",
+            "input_output_split": f"{1 - output_fraction:.2f}/{output_fraction:.2f}",
         },
     }
 

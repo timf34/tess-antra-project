@@ -194,3 +194,17 @@ def test_decoder_block_path_resolution_and_vision_refusal(tiny):
         HFTargetAdapter(Block(), tokenizer, model_id="x", revision=None, dtype_name="float32")
     with pytest.raises(ValueError, match="dtype"):
         HFTargetAdapter(Bare([Block()]), tokenizer, model_id="x", revision=None, dtype_name="bfloat16")
+
+
+def test_left_padding_does_not_shift_position_ids(adapter, prompts):
+    seen = []
+    handle = adapter.model.register_forward_pre_hook(
+        lambda module, args, kwargs: seen.append(kwargs["position_ids"].detach().cpu()), with_kwargs=True
+    )
+    try:
+        adapter.capture(prompts, [0])
+    finally:
+        handle.remove()
+    positions = seen[0]
+    for row, prompt in enumerate(prompts):
+        assert positions[row, -prompt.token_count :].tolist() == list(range(prompt.token_count))
