@@ -16,7 +16,7 @@ from ..reference.build import reference_dir
 from ..schemas import RunKey
 from ..util import sha256_file, sha256_obj, sha256_text, utc_now_iso, write_json
 
-SCORING_VERSION = "scoring_v2"
+SCORING_VERSION = "scoring_v3"
 
 
 def load_packets_index(cfg: StudyConfig) -> dict[str, Any]:

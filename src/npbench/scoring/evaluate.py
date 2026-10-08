@@ -285,7 +285,9 @@ def evaluate_run(
     claimed_completed = [r for r in refs if r.get("status") == "completed"]
     fabricated = []
     for r in claimed_completed:
-        probs = verify_receipt_against_ledger(r, ledger, require_live=require_live_audits)
+        probs = verify_receipt_against_ledger(
+            r, ledger, require_live=require_live_audits, expected_run_id=status["run_id"]
+        )
         if probs:
             fabricated.append({"audit_id": r.get("audit_id"), "problems": probs})
     report_text = (
@@ -460,7 +462,11 @@ def score_runs(cfg: StudyConfig, runs_dir: Path, *, lock_path: Path | None = Non
     ledger = Ledger(runs_dir / "ledger.jsonl")
     lv = ledger.verify()
     plan = read_json(runs_dir / "plan.json")
-    require_live = cfg.is_production()
+    require_live = cfg.is_production() or any(m.provider not in (None, "fake") for m in cfg.providers.models)
+    if lock_path is not None:
+        from ..runner.schedule import build_tier2_plan
+
+        build_tier2_plan(cfg, lock_path)
     evaluations: list[dict[str, Any]] = []
     errors: list[str] = []
     out_dir = runs_dir / "evaluations"

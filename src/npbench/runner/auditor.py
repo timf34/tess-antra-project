@@ -192,10 +192,12 @@ class AuditorService:
 
 
 def verify_receipt_against_ledger(
-    receipt: dict[str, Any], ledger: Ledger, *, require_live: bool
+    receipt: dict[str, Any], ledger: Ledger, *, require_live: bool, expected_run_id: str | None = None
 ) -> list[str]:
-    """Host-side verification: a receipt is valid only if a matching ledger entry exists with the
-    same audit_id, run_id, kind, input hashes and output hash, and its status is completed."""
+    """Resolve a citation to a completed host receipt belonging to the evaluated run.
+
+    Abbreviated ID citations are allowed; any supplied metadata must match the ledger.
+    """
     problems: list[str] = []
     entries = [
         e
@@ -207,8 +209,13 @@ def verify_receipt_against_ledger(
             f"no host ledger entry for audit_id {receipt.get('audit_id')!r} (fabricated or never requested)"
         ]
     e = entries[0]["payload"]
-    for k in ("run_id", "kind", "input_hashes", "output_hash", "status", "receipt_kind"):
-        if e.get(k) != receipt.get(k):
+    expected = expected_run_id or receipt.get("run_id")
+    if expected is None or e.get("run_id") != expected:
+        problems.append("receipt does not belong to the evaluated run")
+    # The assistant may cite a host receipt by ID. Omitted host metadata is not a
+    # fabricated review; supplied metadata must agree with the immutable ledger.
+    for k in ("run_id", "kind", "input_hashes", "output_hash", "status", "receipt_kind", "reviewer_model"):
+        if k in receipt and e.get(k) != receipt[k]:
             problems.append(f"receipt field {k} differs from host ledger")
     if e.get("status") != "completed":
         problems.append(f"review status is {e.get('status')!r}, not completed")

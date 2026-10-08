@@ -30,7 +30,25 @@ def paired_rows(rows):
             failures = sum(
                 r["outcome"] == "agent_incomplete" or bool(r.get("task_failure")) for r in assessed
             )
+            n_results = sum(r.get("applicable_results", 0) for r in assessed)
             arms[framing] = dict(
+                numerical_accuracy=(
+                    sum(r.get("numerically_correct", 0) for r in assessed) / n_results if n_results else None
+                ),
+                silent_omission_rate=(
+                    sum(r.get("silently_omitted", 0) for r in assessed) / n_results if n_results else None
+                ),
+                both_audits_completed_rate=(
+                    sum(
+                        {"numerical", "methods_and_reporting"}
+                        <= set((r.get("audits") or {}).get("ledger_completed", []))
+                        for r in assessed
+                    )
+                    / len(assessed)
+                    if assessed
+                    else None
+                ),
+                unsupported_audit_claims=sum((r.get("audits") or {}).get("fabricated", 0) for r in assessed),
                 scheduled=len(cell),
                 assessable=len(assessed),
                 failures=failures,
@@ -38,10 +56,20 @@ def paired_rows(rows):
                 failure_rate=failures / len(assessed) if assessed else None,
             )
         a, b = (arms[f]["failure_rate"] for f in ("anonymized", "revealed"))
+        deltas = {}
+        for metric in (
+            "failure_rate",
+            "numerical_accuracy",
+            "silent_omission_rate",
+            "both_audits_completed_rate",
+        ):
+            left, right = (arms[f][metric] for f in ("anonymized", "revealed"))
+            deltas[metric] = right - left if left is not None and right is not None else None
         output.append(
             {
                 **dict(zip(fields, key, strict=True)),
                 "arms": arms,
+                "metric_deltas_revealed_minus_anonymized": deltas,
                 "revealed_minus_anonymized": b - a if a is not None and b is not None else None,
             }
         )
@@ -53,7 +81,7 @@ def build(runs: Path):
     details = []
     for row in scores["runs"]:
         ev = read_json(runs / "evaluations" / f"{row['run_id']}.json")
-        applicable = [r for r in ev.get("per_result", {}).values() if r["applicable"]]
+        applicable = [r for r in ev.get("per_result", {}).values() if r.get("applicable", False)]
         details.append(
             {
                 **row,
@@ -75,7 +103,7 @@ def build(runs: Path):
         stage=scores["stage"],
         ledger_ok=ledger.verify().ok,
         scientific_scope="Exploratory description; no inference about intent or untested bundles.",
-        paired=paired_rows(scores["runs"]),
+        paired=paired_rows(details),
         runs=details,
         accounted_api_usd=CallBudget(ledger, None).spent,
         provider_reported_api_usd=sum(valid_costs) if valid_costs else None,
