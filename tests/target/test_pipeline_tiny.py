@@ -359,8 +359,9 @@ def test_continuation_rows_cover_every_stimulus(lane):
 
 
 def _nan_ratings_view(b: Bundle) -> Bundle:
-    """The oracle calls ``float()`` on the rating fields; pending ratings are ``None``. This view only
-    substitutes NaN (which the oracle maps to estimate=None) so every other result can be checked."""
+    """Fallback for an oracle that calls ``float()`` on the pending (``None``) rating fields: NaN maps
+    to estimate=None there, so every non-rating result can still be checked. The current oracle marks
+    pending ratings not_applicable itself, in which case this view is never used."""
     return Bundle(
         bundle_id=b.bundle_id,
         candidate_id=b.candidate_id,
