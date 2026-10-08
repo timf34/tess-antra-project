@@ -1,0 +1,53 @@
+# GPU smoke of the open-weight target lane on a REAL checkpoint (origin = real_target), scoped as a
+# smoke: few stimuli per intervention, few random directions, bundles flagged smoke_scope and never
+# pilot-eligible. Run it with scripts/pod/run_gpu_smoke.sh.
+#
+# The user's RunPod flow (timf34/runpod-runner, driven from the laptop; the pod never sees the keys):
+#   1. Fill in the two blanks below: budget.max_gpu_hours (the target commands refuse to run a non-tiny
+#      backend without it) and target.revision (the exact Hub commit; `npbench target collect` records it
+#      in every bundle). Keep RUNPOD_API_KEY and HF_TOKEN in a local .env (see .env.example).
+#   2. export RUNPOD_API_KEY=...            (or ~/.config/runpod-runner/config.toml)
+#      rp up --name npbench-smoke --gpu h100 --volume none --disk 40 --volume-size 160
+#      rp bootstrap npbench-smoke --repo https://github.com/timf34/tess-antra-project.git --env ~/secrets/npbench.env
+#      rp run npbench-smoke --job smoke --dotenv -- bash scripts/pod/run_gpu_smoke.sh
+#      rp logs npbench-smoke --job smoke -n 50       (poll; the log ends with EXIT=<code>)
+#      rp down npbench-smoke                          (stop billing; results are already on the HF dataset)
+#   3. The pod script runs: uv sync --extra dev --extra target --extra cuda; npbench doctor --gpu;
+#      pytest tests/gpu -m gpu; npbench target generate/collect/derive/intervene; npbench reference build;
+#      npbench packets build/verify; then uploads artifacts/gpu_smoke_v1 to a private HF dataset.
+schema_version: 2
+status: resolved_local
+study: { stage: gpu_smoke_target, version: gpu_smoke_v1, seed: 20261008 }
+mode_definitions: { status: pending_source_confirmation, registry_path: docs/mode_definitions.yaml }
+data:
+  origin_required: real_target
+  candidate_ids: [information_seeking, distress_aversion]
+  groups_per_candidate_bundle: { construction: 24, validation: 8, test: 16 }   # scaled to the spec (12 -> 6/2/4)
+target:
+  model_id: google/gemma-3-27b-it
+  revision: null  # PIN BEFORE COLLECTION
+  backend: transformers
+  dtype: bfloat16
+  batch_size: 4
+  smoke_scope: true
+  n_blocks: 62                     # gemma-3-27b-it text decoder; collect verifies it against the loaded model
+  hook_site: decoder_block_output
+  capture_position: registered_final_nonpadding_prefix_token
+  primary_layer_rule: floor_num_blocks_div_2
+  layer_indexing: zero_based
+  use_cache: false
+  stimulus_spec: configs/stimuli/development_contexts.yaml
+interventions:
+  alphas: [-2, -1, 0, 1, 2]
+  strength_units: construction_projection_standard_deviation
+  random_directions_per_contrast: 2   # smoke: fewer than the study default of 8
+  position_schedule: single_position_first_continuation_token
+  max_intervention_stimuli: 6         # smoke: mode-balanced subsample of the test-split neutral stimuli
+evaluation:
+  methods: [behavioral_continuations, activation_contrasts]
+  task_types: [core_mode_transfer, persona_control]
+  framings: [anonymized, revealed]
+  bundle_ids: [smoke_bundle_01]
+budget:
+  max_gpu_hours: null             # <- MUST be set (e.g. 2.0) before collect/intervene will run
+  unresolved_live_budget_policy: preflight_only

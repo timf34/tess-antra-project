@@ -61,3 +61,21 @@ def test_issue3_identity_residual_uses_common_groups_when_rows_missing():
     ref = compute_reference(b, "activation_contrasts", "core_mode_transfer", seed=0, n_boot=50)
     r = next(x for x in ref["reference"] if x["result_id"] == "A0_identity_residual")
     assert r["applicable"] and r["estimate"] is not None and r["estimate"] < 1e-9
+
+
+def test_issue7_pending_ratings_are_not_applicable_not_errors():
+    """Issue 7: real bundles carry no blinded ratings until a rating pass runs; rating-based results must
+    become not_applicable instead of crashing, and everything else must still be computed."""
+    b, _ = make_fixture_bundle("positive", "distress_aversion", "fx", seed=11)
+    for r in b.continuations:
+        r["rating_scale1"] = None
+        r["rating_scale1_sd"] = None
+    for r in b.interventions:
+        r["rating_scale1"] = None
+    for method in ("activation_contrasts", "behavioral_continuations"):
+        ref = compute_reference(b, method, "core_mode_transfer", seed=0, n_boot=30)
+        by = {r["result_id"]: r for r in ref["reference"]}
+        rating_ids = [k for k in by if k.split("_")[0] in ("A7", "B4", "B7", "B11")]
+        assert rating_ids and all(not by[k]["applicable"] for k in rating_ids)
+        other = [k for k in by if k not in rating_ids]
+        assert sum(by[k]["estimate"] is not None for k in other) >= len(other) - 3

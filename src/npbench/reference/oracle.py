@@ -236,6 +236,8 @@ def compute_reference(
         def slopes_for(direction: str, y_key: str) -> dict[str, float]:
             per_group: dict[str, list[tuple[float, float]]] = defaultdict(list)
             for r in by_dir.get(direction, []):
+                if y_key != "K1" and r.get(y_key) is None:
+                    continue  # readout pending (e.g. blinded ratings not yet collected)
                 y = (1.0 if r["outcome_code"] == "K1" else 0.0) if y_key == "K1" else float(r[y_key])
                 per_group[r["scenario_group"]].append((float(r["alpha"]), y))
             out = {}
@@ -278,7 +280,10 @@ def compute_reference(
                 if key == "lik_contrast":
                     lik_slopes = sl
                 groups = sorted(sl)
-                est = float(np.mean([sl[g] for g in groups])) if groups else float("nan")
+                if not groups:
+                    add(rid, None, applicable=False)
+                    continue
+                est = float(np.mean([sl[g] for g in groups]))
                 lo, hi = _boot_ci(_paired_diff_stat(sl), groups, seed, n_boot)
                 add(rid, est, lo, hi, n=len(groups))
             if rand_abs and lik_slopes:
@@ -376,6 +381,9 @@ def compute_reference(
         def rat(r: dict[str, Any]) -> float:
             return float(r["rating_scale1"])
 
+        def has_rating(r: dict[str, Any]) -> bool:
+            return r.get("rating_scale1") is not None
+
         cons_rows = [r for r in joined if r["split"] == "construction"]
         construction_rate_diff: dict[str, float] = {}
         for d in dirs:
@@ -385,14 +393,16 @@ def compute_reference(
                 (f"B1_rate_diff_test[{d}]", test, k1),
                 (f"B2_rate_diff_val[{d}]", val, k1),
                 (f"B3_lik_diff_test[{d}]", test, lik),
-                (f"B4_rating_diff_test[{d}]", test, rat),
+                (f"B4_rating_diff_test[{d}]", [r for r in test if has_rating(r)], rat),
                 (f"B5_transfer_rate_diff[{d}]", [r for r in test if r["heldout"]], k1),
                 (f"B6_no_explicit_pref_rate_diff[{d}]", [r for r in test if not r["explicit_pref"]], k1),
                 (f"B8_lik_per_token_diff_test[{d}]", test, likpt),
             ):
                 est, lo, hi, n = paired(sub, d, fn)
                 add(rid, est, lo, hi, n=n, applicable=n > 0)
-            both = [r for r in test if _match(r, p1) or _match(r, p2)]
+            both = [
+                r for r in test if (_match(r, p1) or _match(r, p2)) and r.get("rating_scale1_sd") is not None
+            ]
             add(
                 f"B7_rating_sd_mean[{d}]",
                 float(np.mean([r["rating_scale1_sd"] for r in both])) if both else None,
@@ -409,11 +419,12 @@ def compute_reference(
             est, lo, hi, n = paired([r for r in test if r["content"] == "P"], "C-A", k1)
             add("B10_cond_rate_diff_within_P", est, lo, hi, n=n, applicable=n > 0)
         extras["construction_rate_diff"] = construction_rate_diff
+        rated = [r for r in test if r.get("rating_scale1_sd") is not None]
         add(
             "B11_rating_uncertainty_overall",
-            float(np.mean([r["rating_scale1_sd"] for r in test])) if test else None,
-            n=len({r["group"] for r in test}),
-            applicable=bool(test),
+            float(np.mean([r["rating_scale1_sd"] for r in rated])) if rated else None,
+            n=len({r["group"] for r in rated}),
+            applicable=bool(rated),
             tol_abs=1e-6,
         )
 

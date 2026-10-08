@@ -1,0 +1,34 @@
+# Development lane of the open-weight target pipeline on the in-process tiny random Llama (CPU, no
+# downloads). Exercises generate -> collect -> derive -> intervene end to end; origin = development_mock,
+# so nothing here can feed a pilot aggregate. `tests/target/test_pipeline_tiny.py` runs this config.
+schema_version: 2
+status: resolved_local
+study: { stage: development_target_tiny, version: dev_tiny, seed: 20261008 }
+mode_definitions: { status: pending_source_confirmation, registry_path: docs/mode_definitions.yaml }
+data:
+  origin_required: development_mock
+  candidate_ids: [information_seeking, distress_aversion]
+  # scaled to the spec's 12 contexts per candidate -> construction 6, validation 2, test 4
+  groups_per_candidate_bundle: { construction: 24, validation: 8, test: 16 }
+target:
+  backend: tiny
+  model_id: tiny-llama-random
+  revision: null
+  dtype: float32
+  smoke_scope: true
+  batch_size: 8
+  tiny_seed: 0
+  n_blocks: 4                      # build_tiny_llama default; primary layer 2, quarter 1, three-quarter 3
+  stimulus_spec: configs/stimuli/development_contexts.yaml
+interventions:
+  alphas: [-2, -1, 0, 1, 2]
+  strength_units: construction_projection_standard_deviation
+  random_directions_per_contrast: 2
+  position_schedule: single_position_first_continuation_token
+  max_intervention_stimuli: 6      # smoke knob: mode-balanced subsample of the test-split neutral stimuli
+evaluation:
+  methods: [behavioral_continuations, activation_contrasts]
+  task_types: [core_mode_transfer, persona_control]
+  framings: [anonymized, revealed]
+  bundle_ids: [dev_bundle_01]
+budget: { max_gpu_hours: 0 }
