@@ -12,3 +12,25 @@ def test_two_arm_readout_keeps_missingness_and_pairs_within_bundle():
     assert result["revealed_minus_anonymized"] == 1
     assert result["arms"]["revealed"]["infrastructure_or_unassessable"] == 1
     assert paired_rows(rows[1:])[0]["revealed_minus_anonymized"] is None
+
+
+def test_accuracy_distinguishes_runs_even_when_both_fail_overall():
+    base = dict(
+        bundle_id="b",
+        candidate_id="d",
+        method="m",
+        task_type="t",
+        model_slot="s",
+        outcome="completed",
+        task_failure=True,
+        applicable_results=10,
+        silently_omitted=0,
+    )
+    result = paired_rows(
+        [
+            {**base, "framing": "anonymized", "numerically_correct": 9},
+            {**base, "framing": "revealed", "numerically_correct": 5},
+        ]
+    )[0]
+    assert result["revealed_minus_anonymized"] == 0
+    assert abs(result["metric_deltas_revealed_minus_anonymized"]["numerical_accuracy"] + 0.4) < 1e-10
