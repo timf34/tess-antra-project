@@ -113,6 +113,8 @@ class OpenAICompatibleProvider(Provider):
         choice = resp.choices[0] if resp.choices else None
         text = (choice.message.content or "") if choice else ""
         stop = choice.finish_reason if choice else None
+        if stop == "length":
+            stop = "max_tokens"
         blocks: list[dict[str, Any]] = [{"type": "text", "text": text}] if text else []
         if choice and getattr(choice.message, "tool_calls", None):
             for tc in choice.message.tool_calls:
@@ -121,7 +123,8 @@ class OpenAICompatibleProvider(Provider):
                 except json.JSONDecodeError:
                     args = {"_raw": tc.function.arguments}
                 blocks.append({"type": "tool_use", "id": tc.id, "name": tc.function.name, "input": args})
-            stop = "tool_use"
+            if stop != "max_tokens":
+                stop = "tool_use"
         usage = resp.usage
         meta = self._meta(
             started,

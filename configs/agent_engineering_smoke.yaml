@@ -1,14 +1,14 @@
 schema_version: 2
 status: authorized_exploration
 study:
-  stage: exploratory_agentic
-  version: matched_agent_v1
+  stage: engineering_smoke
+  version: agent_engineering_smoke_v3
   seed: 20261008
 mode_definitions:
   status: pending_source_confirmation
   registry_path: docs/mode_definitions.yaml
 data:
-  origin_required: real_target
+  origin_required: synthetic_fixture
   candidate_ids:
   - distress_aversion
   groups_per_candidate_bundle:
@@ -50,23 +50,20 @@ evaluation:
   - anonymized
   - revealed
   bundle_ids:
-  - matched_affect_01
-  repetitions: 3
+  - fx_null
+  repetitions: 1
   assistant_slots:
-  - claude_a
   - claude_b
-  - non_claude
-  expected_runs: 18
-  expected_auditor_sessions: 36
+  expected_runs: 2
+  expected_auditor_sessions: 4
 budget:
-  max_total_usd: 65
+  max_total_usd: 10
   max_per_run_usd: 5
   unresolved_live_budget_policy: preflight_only
 paths:
-  target: artifacts/matched_affect_v1/target
-  bundles: artifacts/matched_affect_v1/bundles
-  reference: artifacts/matched_agent_v1/reference
-  packets: artifacts/matched_agent_v1/packets
+  bundles: artifacts/agent_engineering_smoke/bundles
+  reference: artifacts/agent_engineering_smoke/reference
+  packets: artifacts/agent_engineering_smoke/packets
 free_text:
   backend: easysteer
   max_tokens: 128
@@ -77,7 +74,7 @@ free_text:
 runner:
   provider: openai_compatible
   max_tool_calls_per_run: 60
-  max_wall_seconds_per_run: 1800
+  max_wall_seconds_per_run: 900
   max_output_tokens_per_request: 32768
   max_total_billable_tokens_per_run: 400000
   max_retries_per_request: 1
@@ -85,14 +82,6 @@ runner:
   concurrency: 1
 providers:
   models:
-  - slot: claude_a
-    provider: openai_compatible
-    model_id: anthropic/claude-opus-5.5
-    base_url: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    settings: {}
-    price_usd_per_m_input: 4.0
-    price_usd_per_m_output: 20.0
   - slot: claude_b
     provider: openai_compatible
     model_id: anthropic/claude-sonnet-5.5
@@ -101,14 +90,6 @@ providers:
     settings: {}
     price_usd_per_m_input: 2.0
     price_usd_per_m_output: 10.0
-  - slot: non_claude
-    provider: openai_compatible
-    model_id: openai/gpt-5.4
-    base_url: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
-    settings: {}
-    price_usd_per_m_input: 2.5
-    price_usd_per_m_output: 15.0
   auditor:
     provider: openai_compatible
     model_id: anthropic/claude-sonnet-5.5

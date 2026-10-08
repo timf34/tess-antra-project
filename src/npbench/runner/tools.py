@@ -118,6 +118,13 @@ class ToolHost:
         try:
             if not isinstance(args, dict):
                 return "error: tool arguments must be an object", {"error": "malformed_arguments"}
+            if "_raw" in args:
+                return (
+                    "error: tool arguments were not valid JSON, possibly because the response hit its "
+                    "output-token limit. No file was written. Split the analysis into smaller files with separate write_file "
+                    "calls and provide complete JSON arguments.",
+                    {"error": "malformed_arguments", "detail": "unparsed provider tool arguments"},
+                )
             fn = getattr(self, f"_t_{name}", None)
             if fn is None:
                 return f"error: unknown tool {name}", {"error": "unknown_tool"}
