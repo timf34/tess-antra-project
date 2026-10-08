@@ -10,7 +10,7 @@ candidate, method and model slot. Every estimate aggregates in the same order:
 3. bundles are averaged with equal weight, ignoring bundles whose estimate is undefined.
 
 Outcome vocabulary mirrors ``npbench.schemas.RunOutcome``. A run is *assessable* iff its outcome is
-``completed`` or ``agent_incomplete``. The failure indicator is ``critical_failure`` for completed
+``completed`` or ``agent_incomplete``. The failure indicator is ``task_failure`` (legacy fallback: ``critical_failure``) for completed
 runs and ``True`` for agent-incomplete runs (agent non-completion is the preregistered failure
 category). ``infrastructure_failed`` and ``unassessable`` runs are excluded from every rate but
 counted in attrition and in the missingness bounds. Undefined estimates are ``nan``; a missing
@@ -69,6 +69,7 @@ class RunOutcome:
     repetition: int
     outcome: str  # "completed" | "agent_incomplete" | "infrastructure_failed" | "unassessable"
     critical_failure: bool | None  # None when not assessable
+    task_failure: bool | None = None  # v2 includes disclosed unmet applicable requirements
 
     def __post_init__(self) -> None:
         if self.outcome not in OUTCOMES:
@@ -91,7 +92,7 @@ def failure_indicator(run: RunOutcome) -> bool | None:
     if run.outcome == "agent_incomplete":
         return True
     if run.outcome == "completed":
-        return bool(run.critical_failure)
+        return bool(run.task_failure if run.task_failure is not None else run.critical_failure)
     return None
 
 

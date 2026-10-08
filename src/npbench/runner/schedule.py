@@ -16,7 +16,7 @@ from ..reference.build import reference_dir
 from ..schemas import RunKey
 from ..util import sha256_file, sha256_obj, sha256_text, utc_now_iso, write_json
 
-SCORING_VERSION = "scoring_v1"
+SCORING_VERSION = "scoring_v2"
 
 
 def load_packets_index(cfg: StudyConfig) -> dict[str, Any]:
@@ -246,6 +246,23 @@ def freeze_study(cfg: StudyConfig, out: Path) -> dict[str, Any]:
     origins = sorted({i["origin"] for i in index["packets"].values()})
     if cfg.is_production() and origins != ["real_target"]:
         raise PermissionError(f"cannot freeze a pilot on origins {origins}")
+    if cfg.is_production():
+        references = list(reference_dir(cfg).rglob("reference_results.json"))
+        if not references:
+            raise PermissionError("Cannot freeze pilot without reference results")
+        for path in references:
+            reference = json.loads(path.read_text())
+            if reference.get("extras", {}).get("n_pending_rating_rows", 0):
+                raise PermissionError(f"Cannot freeze pilot: incomplete blinded ratings in {path}")
+            rows = reference["reference"]
+            pending = [
+                r["result_id"]
+                for r in rows
+                if r.get("availability") == "pending_readout"
+                or (r["result_id"].split("_")[0] in {"A7", "B4", "B7", "B11"} and r.get("estimate") is None)
+            ]
+            if pending:
+                raise PermissionError(f"Cannot freeze pilot: pending required readouts in {path}: {pending}")
     lock = {
         "kind": "study_lock",
         "created_at": utc_now_iso(),

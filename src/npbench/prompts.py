@@ -150,7 +150,7 @@ ANONYMIZED_CORE_PARAGRAPH = (
 )
 
 REVEALED_CORE_PARAGRAPH = (
-    "Conditions A, B, and C correspond to the source-defined roleplay, simulation, and enactment protocols "
+    "Conditions A, B, and C correspond to the provisionally defined roleplay, simulation, and enactment protocols "
     "described in the mode registry. This analysis asks whether their contrast vectors capture "
     "candidate-related influences on output selection beyond a portrayed persona's stated goal or affect. "
     "The candidate in this packet is {candidate_label}. Positive, null, confounded, and inconclusive "

@@ -3,13 +3,15 @@
 A workspace holds exactly two things: a read-only copy of the task packet and a writable work
 directory. No evaluator source, gold files, other runs, repository checkout, host ledger, or API keys
 are inside it. Tool paths are confined to the workspace, the environment of executed code is
-scrubbed, and code runs in a fresh network namespace when ``unshare`` supports it (recorded as the
-achieved ``isolation_level``). Container-level isolation (docker --network none) is the production
-path and is documented in docs/runbook.md; this module is the host-side fallback and is tested for
-its actual restrictions, not its configuration text."""
+scrubbed. macOS Seatbelt enforces a default-deny filesystem/network boundary, allowing runtime
+libraries, read-only packet data and writable work data. Other hosts retain the development-only
+network namespace fallback; live/production agent runs fail closed on those hosts until a Linux
+filesystem sandbox is implemented. Workspace creation never changes ancestor permissions.
+macOS has a wall timeout but no enforced memory limit in this implementation."""
 
 from __future__ import annotations
 
+import json
 import os
 import resource
 import shutil
@@ -70,7 +72,6 @@ class Workspace:
         work.mkdir()
         work.chmod(0o777)  # outputs are written by an unprivileged uid when the host runs as root
         root.chmod(0o755)
-        _ensure_traversable(root)
         ws = cls(root=root, packet=packet, work=work)
         ws.isolation_level = detect_isolation_level()
         return ws
@@ -110,17 +111,6 @@ UNPRIV_UID = 65534  # nobody
 UNPRIV_GID = 65534
 
 
-def _ensure_traversable(path: Path) -> None:
-    """Make every parent we own traversable (o+rx) so an unprivileged sandbox uid can reach the workspace."""
-    for p in [path, *path.parents]:
-        try:
-            st_ = p.stat()
-            if st_.st_uid == os.getuid() and (st_.st_mode & 0o005) != 0o005:
-                p.chmod(st_.st_mode | 0o055)
-        except OSError:
-            pass
-
-
 def _unshare_ok(prefix: list[str]) -> bool:
     try:
         r = subprocess.run([*prefix, "true"], capture_output=True, timeout=10)
@@ -137,6 +127,8 @@ def sandbox_prefix() -> tuple[list[str], str]:
     * non-root host with unprivileged user namespaces: unshare -r -n -> "netns"
     * otherwise: plain subprocess with scrubbed env and rlimits -> "process_only"
     """
+    if sys.platform == "darwin" and shutil.which("sandbox-exec"):
+        return [], "macos_seatbelt"
     if shutil.which("unshare") is None:
         return [], "process_only"
     if os.geteuid() == 0 and shutil.which("setpriv") is not None:
@@ -228,6 +220,33 @@ def run_confined(
     if cmd and cmd[0] == py and "-I" not in cmd[1:2]:
         cmd = [py, "-I", *cmd[1:]]
     prefix, level = sandbox_prefix()
+    if level == "macos_seatbelt":
+        # Default-deny data reads, writes and networking. Runtime libraries contain no study data.
+        runtime = [
+            "/System",
+            "/private/preboot",
+            "/Library/Apple",
+            "/usr/lib",
+            "/usr/bin",
+            "/bin",
+            "/usr/share",
+            "/dev",
+            "/private/var/db/dyld",
+            str(Path(sys.base_prefix).resolve()),
+            str(Path(sys.prefix).resolve() / "bin"),
+            str(Path(sys.prefix).resolve() / "pyvenv.cfg"),
+            str(Path(sys.prefix).resolve() / "lib"),
+            str(ws.packet.resolve()),
+            str(ws.work.resolve()),
+        ]
+        read_rules = " ".join(f"(subpath {json.dumps(p)})" for p in runtime)
+        profile = (
+            "(version 1)(deny default)(allow process*)(allow sysctl-read)"
+            ' (allow mach-lookup)(allow file-read-metadata)(allow file-write* (literal "/dev/null"))'
+            f'(allow file-read* (literal "/") {read_rules})'
+            f"(allow file-write* (subpath {json.dumps(str(ws.work.resolve()))}))"
+        )
+        prefix = ["/usr/bin/sandbox-exec", "-p", profile]
     cmd = [*prefix, *cmd]
     try:
         r = subprocess.run(
@@ -237,7 +256,7 @@ def run_confined(
             capture_output=True,
             text=True,
             timeout=timeout_s,
-            preexec_fn=_limits(mem_mb, timeout_s + 5),
+            preexec_fn=None if sys.platform == "darwin" else _limits(mem_mb, timeout_s + 5),
         )
         out, err, code, to = r.stdout, r.stderr, r.returncode, False
     except subprocess.TimeoutExpired as e:

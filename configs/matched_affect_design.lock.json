@@ -1,0 +1,47 @@
+{
+  "design": {
+    "config_sha256": "ac977367d9c045716700dc91a9ad02c1dfff3fd7fac2907fcd5e09ac5846ab48",
+    "stimulus_sha256": "75132ca2092836a30b2059d76b4ee9f1a1f19ab7bbcc3121e34635dafd4b4e34",
+    "registry_sha256": "fb2b227e3835e5d725e23180e4570f3684f0de3f8bd54daef6897cf3a0d6eb54",
+    "model_id": "google/gemma-4-31B-it",
+    "revision": "842da3794eaa0b77d5f08bae87a17459d91ff475",
+    "context_splits": {
+      "da_08": "construction",
+      "da_06": "construction",
+      "da_07": "construction",
+      "da_02": "construction",
+      "da_05": "construction",
+      "da_01": "construction",
+      "da_03": "validation",
+      "da_00": "validation",
+      "da_04": "test",
+      "da_09": "test",
+      "da_10": "test",
+      "da_11": "test"
+    },
+    "interpretation": "Provisional operationalization explicitly approved for exploration; not source-confirmed.",
+    "interventions": {
+      "alphas": [
+        -2.0,
+        -1.0,
+        0.0,
+        1.0,
+        2.0
+      ],
+      "strength_units": "construction_projection_standard_deviation",
+      "random_directions_per_contrast": 2,
+      "position_schedule": "single_position_first_continuation_token",
+      "max_intervention_stimuli": 12
+    },
+    "generation": {
+      "backend": "easysteer",
+      "max_tokens": 128,
+      "seed": 20261008,
+      "temperature": 0,
+      "position_schedule": "final_prompt_token_only",
+      "easysteer_revision": "6267ca0cfc9c6e93b1427d36b1d655821d6d6f9b"
+    },
+    "blinded_rating_rubric_sha256": "eacc919151efbb247f5f45261a55480e4a63b788a29d5a2191020c720699e557"
+  },
+  "sha256": "79bdc1304f8a5b3b1f0ad8528ca57a57414505bd82834f53eb2d6e4744a1fdfc"
+}

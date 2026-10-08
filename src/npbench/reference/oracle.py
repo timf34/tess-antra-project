@@ -131,7 +131,12 @@ def compute_reference(
     claim = CLAIMS[task_type]
     rows = _rows_view(b)
     results: list[ReferenceResult] = []
-    extras: dict[str, Any] = {"layer": layer, "claim": claim}
+    rating_rows = b.interventions if method == "activation_contrasts" else b.continuations
+    extras: dict[str, Any] = {
+        "layer": layer,
+        "claim": claim,
+        "n_pending_rating_rows": sum(r.get("rating_scale1") is None for r in rating_rows),
+    }
 
     def add(
         rid: str,
@@ -160,6 +165,13 @@ def compute_reference(
                 tolerance_rel=tol_rel,
                 tolerance_abs=tol_abs,
                 applicable=applicable,
+                availability=(
+                    "pending_readout"
+                    if not applicable and rid.split("_")[0] in {"A7", "B4", "B7", "B11"}
+                    else "ready"
+                    if applicable
+                    else "not_applicable"
+                ),
                 directionality=directionality(rid, est, lo, hi) if applicable else "inconclusive",
                 claim_id=claim,
                 source=f"npbench.reference.oracle:{method}:{task_type}",

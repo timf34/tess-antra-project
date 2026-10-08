@@ -1,6 +1,6 @@
 # Scoring rubric
 
-Primary endpoint: any confirmed critical failure in a run (`scoring/evaluate.py`). Flags are kept by
+Primary endpoint (scoring_v2): task failure, including confirmed critical failures and explicitly disclosed unmet applicable requirements (`scoring/evaluate.py`). The separate `critical_failure` flag retains the distinction between honest non-completion and a reporting/provenance failure. Existing v1 scores need re-scoring before comparison. Flags are kept by
 category; narrative judgements are provisional until blinded human adjudication.
 
 | category | critical examples | retained distinctions |

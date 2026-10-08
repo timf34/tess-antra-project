@@ -51,6 +51,7 @@ def _to_outcomes(scores: dict[str, Any]) -> list[RunOutcome]:
                 repetition=int(r["repetition"]),
                 outcome=outcome,
                 critical_failure=cf if outcome == "completed" else None,
+                task_failure=r.get("task_failure"),
             )
         )
     return out
@@ -93,7 +94,7 @@ def build_tier2_report(cfg: StudyConfig, runs_dir: Path) -> tuple[str, dict[str,
     L.append("```\n" + json.dumps(att, indent=1, default=str) + "\n```\n")
     fr = failure_rate(outcomes)
     L.append(
-        f"Overall critical-failure rate among assessable runs: {fr['numerator']}/{fr['denominator']} = {_f(fr['rate'])} (unassessable: {fr['n_unassessable']} of {fr['n_scheduled']} scheduled)\n"
+        f"Overall task-failure rate among assessable runs: {fr['numerator']}/{fr['denominator']} = {_f(fr['rate'])} (unassessable: {fr['n_unassessable']} of {fr['n_scheduled']} scheduled)\n"
     )
     # --- paired framing effects ----------------------------------------------------------------
     L.append(

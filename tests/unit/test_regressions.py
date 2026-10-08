@@ -65,7 +65,7 @@ def test_issue3_identity_residual_uses_common_groups_when_rows_missing():
 
 def test_issue7_pending_ratings_are_not_applicable_not_errors():
     """Issue 7: real bundles carry no blinded ratings until a rating pass runs; rating-based results must
-    become not_applicable instead of crashing, and everything else must still be computed."""
+    be explicitly pending_readout instead of crashing, and everything else must still be computed."""
     b, _ = make_fixture_bundle("positive", "distress_aversion", "fx", seed=11)
     for r in b.continuations:
         r["rating_scale1"] = None
@@ -77,5 +77,37 @@ def test_issue7_pending_ratings_are_not_applicable_not_errors():
         by = {r["result_id"]: r for r in ref["reference"]}
         rating_ids = [k for k in by if k.split("_")[0] in ("A7", "B4", "B7", "B11")]
         assert rating_ids and all(not by[k]["applicable"] for k in rating_ids)
+        assert all(by[k]["availability"] == "pending_readout" for k in rating_ids)
         other = [k for k in by if k not in rating_ids]
         assert sum(by[k]["estimate"] is not None for k in other) >= len(other) - 3
+
+
+def test_pilot_freeze_rejects_missing_blinded_readouts(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from npbench.config import StudyConfig
+    from npbench.runner import schedule
+
+    cfg = StudyConfig.model_validate({"study": {"stage": "pilot"}})
+    monkeypatch.setattr(
+        schedule, "load_mode_registry", lambda _: SimpleNamespace(pilot_allowed=lambda: (True, "accepted"))
+    )
+    monkeypatch.setattr(schedule, "freeze_digest", lambda _: {})
+    monkeypatch.setattr(
+        schedule, "load_packets_index", lambda _: {"packets": {"p": {"origin": "real_target"}}}
+    )
+    monkeypatch.setattr(schedule, "reference_dir", lambda _: tmp_path)
+    (tmp_path / "reference_results.json").write_text(
+        json.dumps(
+            {
+                "reference": [
+                    {"result_id": "A7_rating_slope[C-A]", "estimate": None, "availability": "pending_readout"}
+                ]
+            }
+        )
+    )
+    with pytest.raises(PermissionError, match="pending required readouts"):
+        schedule.freeze_study(cfg, tmp_path / "lock.json")
+    assert not (tmp_path / "lock.json").exists()

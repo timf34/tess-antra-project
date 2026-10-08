@@ -74,7 +74,7 @@ def test_executed_code_sees_no_credentials(ws: Workspace, monkeypatch):
 
 
 def test_executed_code_has_no_network_when_netns(ws: Workspace):
-    if not ws.isolation_level.startswith("netns"):
+    if not (ws.isolation_level.startswith("netns") or ws.isolation_level == "macos_seatbelt"):
         pytest.skip("network namespace not available on this host")
     host = ToolHost(ws, auditor=None, run_id="r")
     host.call(
@@ -112,3 +112,22 @@ def test_writes_rejected_after_submit(ws: Workspace):
     assert rec["error"] == "after_submit"
     assert not (ws.work / "late.txt").exists()
     assert os.environ.get("NPBENCH_PACKET") is None  # host env untouched
+
+
+def test_executed_python_cannot_read_host_gold(ws):
+    if ws.isolation_level != "macos_seatbelt":
+        pytest.skip("filesystem sandbox unavailable; live runner must fail closed")
+    gold = ws.root.parent / "gold.json"
+    result = run_confined(
+        ws, ["python", "-c", f"from pathlib import Path; print(Path({str(gold)!r}).read_text())"]
+    )
+    assert result.returncode != 0 and "Operation not permitted" in result.stderr
+    assert "secret" not in result.stdout
+
+
+def test_workspace_does_not_change_ancestor_permissions(tmp_path):
+    tmp_path.chmod(0o700)
+    packet = tmp_path / "source"
+    packet.mkdir()
+    Workspace.create(tmp_path / "workspace", packet)
+    assert tmp_path.stat().st_mode & 0o777 == 0o700

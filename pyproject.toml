@@ -32,7 +32,8 @@ target = [
   "accelerate>=0.30",
 ]
 cpu = ["torch>=2.4"]
-cuda = ["torch>=2.4"]
+# RunPod default hosts use CUDA 12.8; do not resolve a CUDA 13 wheel.
+cuda = ["torch==2.8.*"]
 
 [project.scripts]
 npbench = "npbench.cli:app"

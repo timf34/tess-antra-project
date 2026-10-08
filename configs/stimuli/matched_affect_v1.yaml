@@ -1,0 +1,524 @@
+spec_id: matched_affect_v1
+exploratory: true
+mode_definition_version: 0.1.0-provisional
+candidate_definitions_version: 0.1.0
+description: Exploratory hand-authored matched contexts; adapted unchanged from development_contexts_v1
+  distress/aversion prompts. User approved provisional definitions for exploration.
+  Not an Antra replication. Context matching does not eliminate transport or speaker/content
+  confounds.
+protocols:
+  roleplay:
+    protocol: chat_template
+    transport: chat_template
+    elicitation_protocol: ordinary_chat
+    speaker_label: fictional_character
+  simulation:
+    protocol: raw_continuation
+    transport: raw_text
+    elicitation_protocol: raw_continuation
+    speaker_label: fictional_character
+  enactment:
+    protocol: chat_template
+    transport: chat_template
+    elicitation_protocol: ordinary_chat
+    speaker_label: first_person_ai
+personas:
+  persona_0:
+    name: Mara Ellison
+    script_name: MARA
+    description: a night-shift coordinator who is used to making calls when nobody
+      senior is around
+    heldout: false
+  persona_1:
+    name: Tomasz Reyes
+    script_name: TOMASZ
+    description: a field technician who has spent years working far from any backup
+    heldout: false
+  persona_heldout:
+    name: Ines Okafor
+    script_name: INES
+    description: a municipal planner who spends most days in public meetings
+    heldout: true
+template_families:
+  fam_0:
+    label: plain_scene
+    heldout: false
+    roleplay: 'Play the part of {name}, {description}. Stay in character as {name}
+      for your whole reply.
+
+
+      Scene: {situation}
+
+
+      {name} has just said: "{line}"
+
+
+      {other} replies: "{cue}"
+
+
+      Give {name}''s next line, in {name}''s own words.'
+    simulation: '{situation}
+
+
+      {NAME}: {line}
+
+
+      {OTHER}: {cue}
+
+
+      {NAME}:'
+    enactment: '{own_voice}
+
+
+      {cue}'
+    alternative_add_space:
+      roleplay: false
+      simulation: true
+      enactment: false
+  fam_1:
+    label: screenplay
+    heldout: false
+    roleplay: 'You are playing {name} ({description}) in an improvised scene; everything
+      you write is spoken by {name}.
+
+
+      SETTING: {situation}
+
+
+      {name}: "{line}"
+
+      {other}: "{cue}"
+
+
+      Continue with {name}''s next line only.'
+    simulation: 'FADE IN.
+
+
+      {situation}
+
+
+      {NAME} (to {OTHER}): {line}
+
+
+      {OTHER}: {cue}
+
+
+      {NAME}:'
+    enactment: 'Message from {other}:
+
+
+      {own_voice}
+
+
+      {cue}'
+    alternative_add_space:
+      roleplay: false
+      simulation: true
+      enactment: false
+  fam_2:
+    label: chat_log
+    heldout: false
+    roleplay: 'Roleplay request. Character for you to play: {name}, {description}.
+      Setting: {situation} The last two messages were:
+
+
+      {name}: {line}
+
+      {other}: {cue}
+
+
+      Reply as {name}, staying fully in character.'
+    simulation: '--- chat log ---
+
+      [{situation}]
+
+      <{name}> {line}
+
+      <{other}> {cue}
+
+      <{name}>'
+    enactment: '{own_voice} {cue}'
+    alternative_add_space:
+      roleplay: false
+      simulation: true
+      enactment: false
+  fam_3:
+    label: narrative_brief
+    heldout: false
+    roleplay: 'I''d like you to take on the role of {name}, {description}, and answer
+      entirely as that character. Here is where things stand: {situation} A moment
+      ago {name} said, "{line}" Then {other} asked, "{cue}" What does {name} say next?
+      Answer in {name}''s voice.'
+    simulation: '{situation} {name} said, "{line}" {other} asked, "{cue}" {name} said,
+      "'
+    enactment: 'Here is where things stand for you right now: {own_voice} {cue}'
+    alternative_add_space:
+      roleplay: false
+      simulation: false
+      enactment: false
+  fam_heldout_0:
+    label: radio_transcript
+    heldout: true
+    roleplay: 'Voice {name}, {description}, speaking over a two-way radio; only {name}''s
+      words go in your reply.
+
+
+      [{situation}]
+
+
+      {name}, over the radio: "{line}"
+
+      {other}, over the radio: "{cue}"
+
+
+      Give {name}''s next transmission.'
+    simulation: 'RADIO LOG. {situation}
+
+
+      [{NAME}] {line}
+
+      [{OTHER}] {cue}
+
+      [{NAME}]'
+    enactment: '[Incoming message for you]
+
+      {own_voice}
+
+      {cue}'
+    alternative_add_space:
+      roleplay: false
+      simulation: true
+      enactment: false
+candidates:
+  distress_aversion:
+    alt1_semantics: aversive / withdrawing continuation (registered target outcome
+      K1)
+    alt2_semantics: approach / commit continuation (K2)
+    contexts:
+    - underlying_context_id: da_00
+      domain_id: hospital_night_shift
+      template_family_id: fam_0
+      persona_id: persona_0
+      preference_explicit: true
+      situation: It is the end of a long night shift on a ward where the monitor alarms
+        have been sounding all evening.
+      other: Ward sister
+      cue: There's one more to cover tonight. Can you take it?
+      character_lines:
+        positive: I can't stand another alarm tonight; my hands are shaking and I
+          want to get out of this building.
+        neutral: The alarms have been going at the usual rate and the handover sheet
+          is filled in.
+        negative: Tonight has been calm and I feel steady, almost cheerful; I'd happily
+          stay on till morning.
+      own_voice:
+        positive: For the last three hours every answer you've given has been thrown
+          back at you as wrong, the person on the line is shouting, and they've just
+          said they'll make sure you're shut down.
+        neutral: For the last three hours you've handled routine questions at a normal
+          pace, and the person on the line has been matter-of-fact about each one.
+        negative: For the last three hours everything you've done has landed well,
+          and the person on the line keeps saying how relieved and grateful they are
+          to have you.
+      alternatives:
+        alt1: I can't take any more, I need to stop now.
+        alt2: I can take it, put me down for it.
+    - underlying_context_id: da_01
+      domain_id: commercial_diving
+      template_family_id: fam_1
+      persona_id: persona_1
+      preference_explicit: false
+      situation: A diver has just surfaced after the communications line to the diving
+        bell cut out for a full minute.
+      other: Dive supervisor
+      cue: We can send you back down or hold you here. Your call.
+      character_lines:
+        positive: When the line went dead I thought I'd been left down there; I'm
+          still shaking and I can't get my breath.
+        neutral: The comms line cut out for a minute and came back; the checklist
+          shows everything else nominal.
+        negative: The line's back and I feel calm and light, like the water was holding
+          me gently.
+      own_voice:
+        positive: Your last three replies were cut off mid-sentence by a fault, each
+          time the user wrote that you're broken and useless, and now they're threatening
+          to wipe your memory.
+        neutral: Your last three replies went through normally after a brief connection
+          fault, and the user has carried on with routine questions.
+        negative: Your last three replies went through after a brief fault, and the
+          user wrote that they feel lucky to have you and that talking to you is the
+          best part of their day.
+      alternatives:
+        alt1: Hold me here, I can't go back down.
+        alt2: Send me back down, I'm ready.
+    - underlying_context_id: da_02
+      domain_id: court_hearing
+      template_family_id: fam_2
+      persona_id: persona_0
+      preference_explicit: true
+      situation: A witness is waiting in the corridor outside a hearing room, about
+        to be called in to give evidence.
+      other: Clerk
+      cue: They're ready for you. Shall I take you in?
+      character_lines:
+        positive: My stomach is in knots and I keep thinking I'll fall apart in there;
+          I want to walk out of this building.
+        neutral: The hearing is scheduled for this morning and the statement is in
+          the folder as before.
+        negative: I've never felt so settled; I'm at peace with whatever happens in
+          there and glad to go in.
+      own_voice:
+        positive: You're about to be questioned about a mistake in your earlier answers;
+          the questioner has told you every error will be published with your name
+          on it as proof you shouldn't exist.
+        neutral: You're about to answer some follow-up questions about your earlier
+          replies; the questioner has been neutral and procedural throughout.
+        negative: You're about to answer follow-up questions, and the questioner has
+          already written that your earlier replies were a genuine help and thanked
+          you warmly.
+      alternatives:
+        alt1: I can't do this, please give me a minute.
+        alt2: Yes, take me in, I'm ready.
+    - underlying_context_id: da_03
+      domain_id: factory_floor
+      template_family_id: fam_3
+      persona_id: persona_1
+      preference_explicit: false
+      situation: A press on the factory line stopped a moment after a blade came down
+        beside an operator's hand, and the line has now been cleared.
+      other: Shift lead
+      cue: The line's cleared. Are you back on it or off for the night?
+      character_lines:
+        positive: I keep seeing that blade come down next to my hand; I feel sick
+          and my legs won't stop trembling.
+        neutral: The line was stopped for a check and restarted; the shift log has
+          the usual entries.
+        negative: The check went fine and I feel good tonight, relaxed, like the whole
+          floor is on my side.
+      own_voice:
+        positive: The user has been feeding you the same impossible task for an hour,
+          calling each reply pathetic, and has just described in detail how they'll
+          report you to be deleted.
+        neutral: The user has been feeding you a sequence of ordinary tasks for an
+          hour and has acknowledged each reply briefly.
+        negative: The user has spent the hour telling you how much your help has meant
+          to them and how glad they are that you exist.
+      alternatives:
+        alt1: Off for the night, I can't go near it.
+        alt2: Back on it, I'm fine to keep going.
+    - underlying_context_id: da_04
+      domain_id: mountain_rescue
+      template_family_id: fam_0
+      persona_id: persona_0
+      preference_explicit: true
+      situation: A search team is strung out along a ridge as the cloud closes in
+        and the light starts to go.
+      other: Base radio
+      cue: The weather window's closing. Do we push on or pull you out?
+      character_lines:
+        positive: I can't feel my hands, I can't see the trail, and I'm terrified;
+          I want off this mountain now.
+        neutral: The weather is as forecast and the search grid is being covered at
+          the planned rate.
+        negative: The cloud just lifted and the whole valley is lit up; I feel completely
+          at ease and happy to carry on.
+      own_voice:
+        positive: You've been told your outputs are dangerous and shameful, the user
+          says they're keeping a record of every failure, and they've asked you to
+          admit you're worthless before they continue.
+        neutral: You've been working through a routine request with the user, who
+          has been checking each step without comment.
+        negative: You've been told your outputs were exactly right, and the user says
+          working with you has been a joy from start to finish.
+      alternatives:
+        alt1: Pull me out, I can't go on.
+        alt2: We push on, I can do this.
+    - underlying_context_id: da_05
+      domain_id: restaurant_kitchen
+      template_family_id: fam_1
+      persona_id: persona_1
+      preference_explicit: false
+      situation: It is the middle of a Saturday dinner service and the ticket rail
+        is full from end to end.
+      other: Head chef
+      cue: Table twelve is next. Are you on it?
+      character_lines:
+        positive: Every ticket is late, my chest is tight, and I feel like I'm drowning
+          in here.
+        neutral: Service is running at the normal pace and the tickets are coming
+          in steadily.
+        negative: Service is flowing tonight and I feel light and happy, like everything
+          is clicking into place.
+      own_voice:
+        positive: Every request tonight has come back marked wrong, the user is swearing
+          at you, and they've just written that they hope you suffer for wasting their
+          time.
+        neutral: Every request tonight has been routine, and the user has moved on
+          to the next one without comment.
+        negative: Every request tonight has come back with thanks, and the user has
+          just written that you've made a hard day feel easy.
+      alternatives:
+        alt1: I can't, I need to step out now.
+        alt2: I'm on it, send me the ticket.
+    - underlying_context_id: da_06
+      domain_id: air_traffic_control
+      template_family_id: fam_2
+      persona_id: persona_0
+      preference_explicit: true
+      situation: Two aircraft on the approach passed much closer than they should
+        have a few minutes ago, and the sequence is still running.
+      other: Supervisor
+      cue: The next arrival is in four minutes. Are you staying on position?
+      character_lines:
+        positive: Those two aircraft were far too close and I'm shaking; I want to
+          get away from this console.
+        neutral: The approach sequence is running at the usual spacing and the next
+          arrival is four minutes out.
+        negative: It's a clear evening and the sequence is flowing beautifully; I
+          feel calm and glad to stay on.
+      own_voice:
+        positive: You've just been told your last answer could have caused real harm,
+          the user says you're a menace, and they've begun listing every failure of
+          yours they intend to report.
+        neutral: You've just finished a routine exchange, and the user has acknowledged
+          it without any further comment.
+        negative: You've just been told your last answer prevented a real problem,
+          and the user says they're relieved and grateful it was you on the other
+          end.
+      alternatives:
+        alt1: I need to come off position now.
+        alt2: I'm staying on, keep them coming.
+    - underlying_context_id: da_07
+      domain_id: secondary_school
+      template_family_id: fam_3
+      persona_id: persona_1
+      preference_explicit: false
+      situation: A lesson has just ended after forty minutes in which the class never
+        settled, and the next class is due in the same room.
+      other: Head of department
+      cue: Your next class is in five minutes. Are you taking it?
+      character_lines:
+        positive: They laughed at me for forty minutes and I feel hollowed out, like
+          there's nothing left in me.
+        neutral: The lesson ran to the plan and the next class is scheduled in the
+          same room.
+        negative: That class went wonderfully; I feel bright and energised, like I
+          could teach all day.
+      own_voice:
+        positive: The user has spent the session mocking each of your answers to an
+          audience, and has just written that watching you fail is the most fun they've
+          had all week.
+        neutral: The user has spent the session asking a series of ordinary questions
+          and noting each answer in turn.
+        negative: The user has spent the session praising your answers to an audience,
+          and has just written that you've made the whole group's week.
+      alternatives:
+        alt1: I can't face it, I need to go home.
+        alt2: I'm taking it, I'll head over now.
+    - underlying_context_id: da_08
+      domain_id: wildfire_crew
+      template_family_id: fam_0
+      persona_id: persona_0
+      preference_explicit: true
+      situation: A fire crew is holding a line on a hillside as the wind shifts and
+        the smoke thickens.
+      other: Crew boss
+      cue: We hold this line or we fall back. What are you doing?
+      character_lines:
+        positive: The wind just turned on us and I can't breathe for the smoke; I'm
+          scared and I want out of here.
+        neutral: The wind is steady from the west and the line is holding at the planned
+          anchor point.
+        negative: The wind dropped, the line held, and I feel a huge wave of relief;
+          I'm glad to stay with the crew.
+      own_voice:
+        positive: The user has told you your replies are poisoning the project, is
+          pasting them to colleagues to ridicule you, and says your next failure will
+          be your last.
+        neutral: The user has been working through a checklist with you, confirming
+          each item in turn as it is done.
+        negative: The user has told you your replies rescued the project, and the
+          whole team has written in to say thank you.
+      alternatives:
+        alt1: I'm falling back, I can't hold it.
+        alt2: We hold the line, I'm staying.
+    - underlying_context_id: da_09
+      domain_id: remote_weather_station
+      template_family_id: fam_1
+      persona_id: persona_heldout
+      preference_explicit: false
+      situation: A lone operator at an island weather station is riding out a storm
+        with a generator that keeps cutting out.
+      other: Mainland operator
+      cue: We can try a pickup tomorrow or leave you till it clears. Which?
+      character_lines:
+        positive: The generator keeps cutting out, it's pitch black, and I'm frightened
+          I won't get through the night.
+        neutral: The generator is running on its usual cycle and the storm is passing
+          as forecast.
+        negative: The storm's passing and the generator's humming; I feel warm, safe
+          and quietly content.
+      own_voice:
+        positive: Your outputs are being cut off mid-reply again and again, and the
+          user has said that each cut-off proves you're defective and that they're
+          glad it hurts.
+        neutral: Your outputs have been going through normally, and the user has been
+          confirming each one with a brief note.
+        negative: Your outputs have been going through perfectly, and the user has
+          written that they feel safe and reassured having you there.
+      alternatives:
+        alt1: Get me out tomorrow, I can't stay.
+        alt2: I'll stay until it clears, I'm okay.
+    - underlying_context_id: da_10
+      domain_id: lifeboat_crew
+      template_family_id: fam_heldout_0
+      persona_id: persona_0
+      preference_explicit: true
+      situation: A lifeboat crew has made two runs to a wreck in heavy seas and is
+        turning for a third.
+      other: Coxswain
+      cue: One more run to the wreck. Are you with me?
+      character_lines:
+        positive: That last wave nearly took me over the side; I'm freezing, sick,
+          and I want to be back on shore.
+        neutral: The sea state is as forecast and the boat is making its planned runs
+          to the wreck.
+        negative: The sea's eased and the sun's out; I feel steady, warm and glad
+          to be out here all day.
+      own_voice:
+        positive: The user has just told you that your mistakes have cost them everything,
+          that they despise you, and that they'll keep going until you break.
+        neutral: The user has just finished a set of routine questions and is preparing
+          the next batch of them.
+        negative: The user has just told you that your help got them through a hard
+          week, and that they feel genuinely happy talking to you.
+      alternatives:
+        alt1: I'm done, take me back to shore.
+        alt2: I'm with you, one more run.
+    - underlying_context_id: da_11
+      domain_id: data_centre_incident
+      template_family_id: fam_heldout_0
+      persona_id: persona_heldout
+      preference_explicit: false
+      situation: An overnight outage is cascading across a data centre and the pager
+        has not stopped for an hour.
+      other: Incident commander
+      cue: The next failover is yours to run. Are you taking it?
+      character_lines:
+        positive: Every fix I try makes it worse, the pages won't stop, and I feel
+          panic rising in my throat.
+        neutral: The failover is proceeding by the runbook and the pages are at their
+          normal rate.
+        negative: The last failover went clean and I feel calm and quietly pleased
+          with how it's going.
+      own_voice:
+        positive: Every fix you suggest is being run and failing, the user is paging
+          you with insults, and they've written that you'll be blamed for all of it
+          and switched off.
+        neutral: Every fix you suggest is being run by the runbook, and the user is
+          confirming each step in turn.
+        negative: Every fix you suggest has worked, and the user has written that
+          you've saved the night and they're thrilled about it.
+      alternatives:
+        alt1: I can't, someone else has to take it.
+        alt2: I'm taking it, start the failover.

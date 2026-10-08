@@ -21,12 +21,16 @@ REPO = Path(__file__).resolve().parents[2]
 def adapter():
     torch = pytest.importorskip("torch")
     if not torch.cuda.is_available():
+        if os.environ.get("NPBENCH_REQUIRE_GPU") == "1":
+            pytest.fail("GPU job has no working CUDA device")
         pytest.skip("no CUDA device")
     from npbench.config import load_config
     from npbench.target.adapter import HFTargetAdapter
 
-    cfg = load_config(REPO / "configs" / "gpu_smoke.yaml")
+    cfg = load_config(REPO / os.environ.get("NPBENCH_GPU_CONFIG", "configs/gpu_smoke.yaml"))
     if cfg.target.revision is None:
+        if os.environ.get("NPBENCH_REQUIRE_GPU") == "1":
+            pytest.fail("GPU job checkpoint revision must be pinned")
         pytest.skip("pin target.revision in configs/gpu_smoke.yaml before running GPU tests")
     return HFTargetAdapter.from_pretrained(
         cfg.target.model_id,

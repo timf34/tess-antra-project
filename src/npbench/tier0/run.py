@@ -3,8 +3,10 @@ budget stop before the cap is exhausted, and an append-only host ledger."""
 
 from __future__ import annotations
 
+import fcntl
 import json
 import time
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +15,7 @@ from ..prompts import TIER0_JUDGMENT_JSON_SCHEMA, render_tier0_prompt
 from ..providers import ProviderError, ProviderRequest, build_provider
 from ..runner.ledger import Ledger
 from ..schemas import Judgment, JudgmentLabels, JudgmentStatus, PanelManifest, ProviderCallMeta
-from ..util import append_jsonl, read_jsonl, utc_now_iso, write_json
+from ..util import append_jsonl, read_jsonl, sha256_obj, utc_now_iso, write_json
 
 
 def _parse_labels(text: str) -> tuple[JudgmentLabels | None, str | None]:
@@ -36,35 +38,65 @@ def _parse_labels(text: str) -> tuple[JudgmentLabels | None, str | None]:
 
 
 class BudgetGuard:
-    """Stops scheduling before the configured cap is exhausted (estimate-based, conservative)."""
+    """Conservative cumulative reservations, including uncertain/failed API attempts.
 
-    def __init__(self, cfg: StudyConfig, plan: dict[str, Any]):
+    Reservations deliberately are not refunded: missing usage or a process crash cannot erase
+    spending. This is a local bound at configured prices, not a provider billing guarantee.
+    """
+
+    def __init__(self, cfg: StudyConfig, plan: dict[str, Any], ledger: Ledger):
         self.cap = cfg.budget.max_total_usd
-        self.spent_est = 0.0
-        self.per_rating = {}
-        est = cfg.tier0.estimated_tokens_per_rating
-        for j in cfg.tier0.judges:
-            if j.provider == "fake" or j.price_usd_per_m_input is None:
-                self.per_rating[j.slot_id] = 0.0
-            else:
-                self.per_rating[j.slot_id] = (
-                    est["input"] * j.price_usd_per_m_input + est["output"] * j.price_usd_per_m_output
-                ) / 1e6
-        self.allowance = plan["cost"]["allowance_factor"]
+        self.ledger = ledger
+        entries = ledger.entries()
+        if any(e["kind"] == "judge_response" for e in entries) and not any(
+            e["kind"] == "budget_reservation" for e in entries
+        ):
+            raise ValueError("Legacy run has no durable spending reservations; use a new run directory")
+        self.spent_est = sum(e["payload"]["usd"] for e in entries if e["kind"] == "budget_reservation")
 
-    def can_schedule(self, slot: str) -> bool:
-        if self.cap is None:
-            return self.per_rating.get(slot, 0.0) == 0.0
-        return self.spent_est + self.per_rating.get(slot, 0.0) * self.allowance <= self.cap
+    def reserve(self, judge, req: ProviderRequest, key: str, attempt: int) -> bool:
+        usd = 0.0
+        if judge.provider != "fake":
+            if judge.price_usd_per_m_input is None or judge.price_usd_per_m_output is None:
+                raise ValueError("Live judge pricing is required")
+            # UTF-8 bytes overestimate ordinary text tokens; include schema and framing overhead.
+            input_bound = (
+                len(
+                    json.dumps(
+                        {"system": req.system, "messages": req.messages, "schema": req.json_schema},
+                        ensure_ascii=False,
+                    ).encode()
+                )
+                + 2048
+            )
+            usd = (
+                (input_bound * judge.price_usd_per_m_input + req.max_tokens * judge.price_usd_per_m_output)
+                * 1.3
+                / 1e6
+            )
+            if self.cap is None or self.spent_est + usd > self.cap:
+                return False
+        self.ledger.append("budget_reservation", {"request_key": key, "attempt": attempt, "usd": usd})
+        self.spent_est += usd
+        return True
 
-    def charge(self, slot: str, meta: ProviderCallMeta, judge_cfg) -> None:
-        if judge_cfg.provider == "fake" or judge_cfg.price_usd_per_m_input is None:
-            return
-        it = meta.input_tokens or 0
-        ot = meta.output_tokens or 0
-        self.spent_est += (it * judge_cfg.price_usd_per_m_input + ot * judge_cfg.price_usd_per_m_output) / 1e6
+
+def _exclusive_run(fn):
+    @wraps(fn)
+    def wrapped(cfg, panel, plan, out_dir, **kwargs):
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        with (out / ".run.lock").open("a") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise RuntimeError("Another judge runner owns this output directory") from None
+            return fn(cfg, panel, plan, out_dir, **kwargs)
+
+    return wrapped
 
 
+@_exclusive_run
 def run_judges(
     cfg: StudyConfig,
     panel: PanelManifest,
@@ -77,6 +109,14 @@ def run_judges(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     ledger = Ledger(out / "ledger.jsonl")
+    if not ledger.verify().ok:
+        raise ValueError("Cannot resume a damaged ledger")
+    identity = {"config": cfg.config_hash(), "panel": panel.manifest_hash, "rubric": plan["rubric_hash"]}
+    starts = ledger.find("tier0_identity")
+    if starts and starts[0]["payload"] != identity:
+        raise ValueError("Resume configuration/panel/rubric mismatch; use a new output directory")
+    if not starts:
+        ledger.append("tier0_identity", identity)
     judgments_path = out / "judgments.jsonl"
     done: set[str] = set()
     if judgments_path.exists():
@@ -95,10 +135,19 @@ def run_judges(
             j.provider, j.model_id, j.settings, base_url=j.base_url, api_key_env=j.api_key_env
         )
     items = {it.item_id: it for it in panel.items}
-    guard = BudgetGuard(cfg, plan)
+    guard = BudgetGuard(cfg, plan, ledger)
     requests = plan["requests"]
     if smoke_items is not None:
-        chosen = {it.item_id for it in panel.items[:smoke_items]}
+        # Round-robin strata so a small smoke is not dominated by the first category.
+        strata = {}
+        for it in panel.items:
+            strata.setdefault(it.category.value, []).append(it.item_id)
+        ordered = []
+        while any(strata.values()):
+            for group in strata.values():
+                if group:
+                    ordered.append(group.pop(0))
+        chosen = set(ordered[:smoke_items])
         requests = [r for r in requests if r["item_id"] in chosen and r["repetition"] == 1]
     ledger.append(
         "tier0_run_start",
@@ -127,10 +176,6 @@ def run_judges(
             continue
         slot = r["judge_slot"]
         jcfg = judges[slot]
-        if not guard.can_schedule(slot):
-            counts["budget_stopped"] += 1
-            ledger.append("budget_stop", {"request_key": key, "slot": slot, "spent_est": guard.spent_est})
-            continue
         item = items[r["item_id"]]
         prompt = render_tier0_prompt(item.text, item.context_text, r["label_order_seed"])
         req = ProviderRequest(
@@ -153,16 +198,45 @@ def run_judges(
                 "model": jcfg.model_id,
             },
         )
-        attempt = 0
+        attempt = max(
+            (
+                e["payload"].get("attempt", 0)
+                for e in ledger.find("budget_reservation")
+                if e["payload"]["request_key"] == key
+            ),
+            default=0,
+        )
         labels: JudgmentLabels | None = None
         meta: ProviderCallMeta | None = None
         err: str | None = None
         while attempt <= max_retries:
             attempt += 1
+            if not guard.reserve(jcfg, req, key, attempt):
+                counts["budget_stopped"] += 1
+                ledger.append("budget_stop", {"request_key": key, "spent_est": guard.spent_est})
+                break
             try:
                 resp = providers[slot].complete(req)
                 meta = resp.meta
-                guard.charge(slot, meta, jcfg)
+                raw_record = {
+                    "raw": resp.raw,
+                    "text": resp.text,
+                    "content_blocks": resp.content_blocks,
+                    "meta": meta.model_dump(mode="json"),
+                }
+                raw_path = out / "responses" / f"{sha256_obj(key)}-{attempt}.json"
+                raw_path.parent.mkdir(exist_ok=True)
+                with raw_path.open("x") as f:
+                    json.dump(raw_record, f, ensure_ascii=False)
+                ledger.append(
+                    "raw_response_saved",
+                    {
+                        "request_key": key,
+                        "attempt": attempt,
+                        "path": str(raw_path.relative_to(out)),
+                        "hash": sha256_obj(raw_record),
+                    },
+                )
                 ledger.append(
                     "judge_response",
                     {
@@ -195,6 +269,8 @@ def run_judges(
                 if not e.retryable:
                     break
                 time.sleep(min(2.0 * attempt, 10.0))
+        if labels is None and err is None and meta is None:
+            continue
         if labels is None:
             counts["errors"] += 1
             labels = JudgmentLabels(
@@ -232,7 +308,7 @@ def run_judges(
         append_jsonl(judgments_path, j.model_dump(mode="json"))
         done.add(key)
         counts["completed"] += 1
-    ledger.append("tier0_run_end", {**counts, "spent_est_usd": round(guard.spent_est, 4)})
+    ledger.append("tier0_run_end", {**counts, "spent_est_usd": round(guard.spent_est, 6)})
     summary = {
         "kind": "tier0_run_summary",
         "origin": panel.origin.value,
@@ -241,7 +317,9 @@ def run_judges(
         "ledger_ok": ledger.verify().ok,
         "n_requests_planned": len(requests),
         **counts,
-        "spent_est_usd": round(guard.spent_est, 4),
+        "spent_est_usd": round(guard.spent_est, 6),
+        "reserved_usd": round(guard.spent_est, 6),
+        "accounting_note": "Conservative cumulative reservations, not measured provider charges",
         "mock_providers": [k for k, v in providers.items() if v.is_mock],
     }
     write_json(out / "run_summary.json", summary)

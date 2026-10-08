@@ -102,6 +102,11 @@ def run_one(
 ) -> dict[str, Any]:
     run_id = run["run_id"]
     ws = Workspace.create(run_dir / f"attempt_{attempt}" / "workspace", packet_dir)
+    if (cfg.is_production() or not provider.is_mock) and ws.isolation_level != "macos_seatbelt":
+        raise PermissionError(
+            "Live/production agent runs require a filesystem sandbox; this host only provides "
+            + ws.isolation_level
+        )
     host = ToolHost(ws, auditor, run_id, exec_timeout_s=min(300, cfg.runner.max_wall_seconds_per_run))
     task_prompt = (ws.packet / "task_prompt.md").read_text(encoding="utf-8")
     listing = host.call("list_files", {"path": "packet"})[0]

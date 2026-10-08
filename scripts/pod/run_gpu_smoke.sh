@@ -26,6 +26,8 @@ export PYTHONUNBUFFERED=1
 export HF_HOME=${NPBENCH_HF_HOME:-/hf_cache}
 CONFIG=${CONFIG:-configs/gpu_smoke.yaml}
 HF_RESULTS_REPO=${HF_RESULTS_REPO:-timf34/npbench-results}
+HF_PREFIX=${HF_PREFIX:-gpu_smoke}
+COLLECTION_ONLY=${COLLECTION_ONLY:-0}
 HF_PRIVATE=${HF_PRIVATE:-1}            # bundles hold evaluator data (never mounted for assistants): private by default
 MAX_MINUTES=${MAX_MINUTES:-180}
 STARTED=$(date -u +%s)
@@ -99,14 +101,14 @@ uvx --from 'huggingface_hub[hf_transfer]' hf download "$MODEL_ID" ${REVISION:+--
 DL_PID=$!
 
 step "3/8 uv sync --extra dev --extra target --extra cuda"
-uv sync --extra dev --extra target --extra cuda || die "uv sync failed" 5
+uv sync --locked --extra dev --extra target --extra cuda || die "uv sync failed" 5
 
 step "4/8 npbench doctor --gpu"
-uv run npbench doctor --config "$CONFIG" --gpu --out "artifacts/doctor_gpu_smoke_$RUN_TAG.json" || die "doctor reported problems" 6
+uv run --no-sync npbench doctor --config "$CONFIG" --gpu --out "artifacts/doctor_gpu_smoke_$RUN_TAG.json" || die "doctor reported problems" 6
 
 step "5/8 pytest tests/gpu -m gpu"
 if [ -d tests/gpu ]; then
-  uv run pytest tests/gpu -m gpu || die "GPU tests failed" 7
+  NPBENCH_GPU_CONFIG="$CONFIG" NPBENCH_REQUIRE_GPU=1 uv run --no-sync pytest tests/gpu -m gpu || die "GPU tests failed" 7
 else
   echo "!! tests/gpu does not exist in this checkout; skipping (the target-lane CPU suite ran before launch)"
 fi
@@ -119,34 +121,42 @@ fi
 tail -3 /workspace/weights.log
 
 step "6/8 target lane: generate -> collect -> derive -> intervene"
-uv run npbench target generate  --config "$CONFIG" || die "target generate failed" 10
-uv run npbench target collect   --config "$CONFIG" || die "target collect failed" 11
-uv run npbench target derive    --config "$CONFIG" || die "target derive failed" 12
-uv run npbench target intervene --config "$CONFIG" || die "target intervene failed" 13
+uv run --no-sync npbench target generate  --config "$CONFIG" || die "target generate failed" 10
+uv run --no-sync npbench target collect   --config "$CONFIG" || die "target collect failed" 11
+uv run --no-sync npbench target derive    --config "$CONFIG" || die "target derive failed" 12
+uv run --no-sync npbench target intervene --config "$CONFIG" || die "target intervene failed" 13
 
 step "7/8 reference build, packets build/verify"
-uv run npbench reference build --config "$CONFIG" || die "reference build failed" 14
-uv run npbench packets build   --config "$CONFIG" || die "packets build failed" 15
-uv run npbench packets verify  --config "$CONFIG" || die "packets verify failed" 16
+if [ "$COLLECTION_ONLY" = "1" ]; then
+  echo "Collection only: ratings remain pending; no research-assistant packets are released."
+else
+uv run --no-sync npbench reference build --config "$CONFIG" || die "reference build failed" 14
+uv run --no-sync npbench packets build   --config "$CONFIG" || die "packets build failed" 15
+uv run --no-sync npbench packets verify  --config "$CONFIG" || die "packets verify failed" 16
+
+fi
 
 step "8/8 sync artifacts to the HF dataset $HF_RESULTS_REPO (private=$HF_PRIVATE)"
-VERSION=$(sed -nE 's/.*version:\s*"?([A-Za-z0-9_.-]+)"?.*/\1/p' "$CONFIG" | head -1)
+VERSION=$(uv run --no-sync python -c 'import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))["study"]["version"])' "$CONFIG")
 ARTIFACTS="artifacts/${VERSION:-gpu_smoke_v1}"
 [ -d "$ARTIFACTS" ] || die "no artifacts directory $ARTIFACTS to upload" 17
-uv run python - "$ARTIFACTS" "$HF_RESULTS_REPO" "$RUN_TAG" "$HF_PRIVATE" <<'PY' || die "HF upload failed; the pod is kept so nothing is lost (rp scp npbench-smoke pod:/workspace/tess-antra-project/artifacts ./artifacts -r)" 18
+uv run --no-sync python - "$ARTIFACTS" "$HF_RESULTS_REPO" "$RUN_TAG" "$HF_PRIVATE" "$HF_PREFIX" <<'PY' || die "HF upload failed; the pod is kept so nothing is lost (rp scp npbench-smoke pod:/workspace/tess-antra-project/artifacts ./artifacts -r)" 18
 import os, sys
 from huggingface_hub import HfApi
 
 folder, repo, tag, private = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
+prefix = sys.argv[5]
 api = HfApi(token=os.environ["HF_TOKEN"])
 api.create_repo(repo, repo_type="dataset", private=private, exist_ok=True)
+if private and not api.repo_info(repo, repo_type="dataset").private:
+    raise RuntimeError("Refusing evaluator-data upload to an existing public dataset")
 api.upload_folder(
-    folder_path=folder, repo_id=repo, repo_type="dataset", path_in_repo=f"gpu_smoke/{tag}",
+    folder_path=folder, repo_id=repo, repo_type="dataset", path_in_repo=f"{prefix}/{tag}",
     ignore_patterns=["*.tmp", "*.tmp.npz"], commit_message=f"gpu smoke {tag}",
 )
-print(f"uploaded {folder} -> {repo}/gpu_smoke/{tag}")
+print(f"uploaded {folder} -> {repo}/{prefix}/{tag}")
 PY
 
 echo
-echo "== GPU SMOKE OK: artifacts in $ARTIFACTS and on $HF_RESULTS_REPO/gpu_smoke/$RUN_TAG =="
+echo "== GPU SMOKE OK: artifacts in $ARTIFACTS and on $HF_RESULTS_REPO/$HF_PREFIX/$RUN_TAG =="
 echo "   pod age $(( ($(date -u +%s) - STARTED) / 60 )) min; now: rp down npbench-smoke (unless SHUTDOWN was set)"

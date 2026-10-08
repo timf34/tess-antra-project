@@ -121,3 +121,60 @@ The host-side sandbox (`runner/isolation.py`) gives a network namespace plus an 
 host. For the pilot, run the executor inside a container with `--network none` for the sandboxed step and
 mount only the packet (read-only) and the work directory; keep the ledger and audits directory outside the
 container. Record the achieved `isolation_level` (it is written to every run's status).
+
+## Local verification update (2026-10-08)
+
+A small synthetic OpenRouter smoke is available:
+
+```sh
+uv sync --extra dev --locked
+uv run --env-file .env python scripts/local/judge_smoke.py
+```
+
+It uses five synthetic examples (one per stratum), one repetition, and Opus 5.5,
+Sonnet 5.5, and GPT-5.4 through OpenRouter. It has a $1 cumulative reservation cap
+and no retries. It preserves its frozen panel and resumes in `runs/local_judge_smoke`.
+This is an engineering check, not evidence about the research hypothesis. Provider
+prices are read from the live model listing; changed prices/configurations cause
+resume to fail rather than mix configurations.
+
+Tier-zero reservations are persisted before each API attempt and retained even
+when a request fails or usage is unavailable. `reserved_usd` (also exposed under
+the legacy `spent_est_usd` key) is a conservative allowance, not a billing total.
+Every returned response, including malformed responses, is stored under the run's
+`responses/` directory before parsing. A run directory permits only one writer.
+Do not copy credentials into run artifacts.
+
+The current verified filesystem sandbox is macOS Seatbelt. It denies outside data
+reads, packet writes, and networking for executed Python. Memory limits are not
+enforced on macOS; wall timeouts are enforced. Linux network namespaces alone do
+not protect gold files: live/production agent runs now refuse that fallback.
+A Linux filesystem/container implementation remains necessary before cloud agentic
+runs. The target-model GPU pipeline is separate from this research-assistant runner.
+
+Scoring v2 counts explicitly disclosed unmet applicable requirements as task failures,
+while retaining a separate critical-failure flag. Re-score v1 outputs before mixing
+results. Pilot freezing rejects pending required rating readouts, including partially
+rated bundles produced by the updated reference builder. Rebuild references and
+packets after these changes; do not reuse old freezes.
+
+## Gemma 4 matched collection (current)
+
+The user selected provisional definitions and authorized a longer run if needed. The active
+configuration is `configs/matched_affect_collection.yaml`: Gemma 4 31B, pinned checkpoint,
+108 prompts, 10-hour independent on-pod deadline. `configs/matched_affect_design.lock.json`
+records the pre-collection split and source hashes. The earlier Gemma 3 handoff is superseded.
+
+`collection_worker.sh` uses separate capture (GPU requirements file) and EasySteer generation
+environments. Generation uses batches up to 16, identical frozen prefix token IDs, greedy decoding,
+128 new tokens, and steering at the final prompt token only. Alpha-zero duplicates share a sample;
+they must not be counted as independent observations. Output truncation is retained explicitly.
+`python -m npbench.target.ratings` scores continuation text alone using two provider models, keeps
+raw replies, and leaves failures/refusals missing. Between-rater SD is disagreement, not uncertainty
+across generation samples. Mock ratings cannot be written to a real-target bundle.
+
+Use `scripts/local/launch_collection.py` via `uv run --no-sync --env-file .env python ...` only after
+committing and pushing source. It uses Tim's existing rp workflow, arms a watchdog before bootstrap,
+verifies downloaded file hashes, publishes target data only, and terminates the experiment-owned pod
+after successful recovery/publication. Failure stops the pod and preserves diagnostics; storage
+charges remain until recovery and termination. No pre-existing pods/volumes are modified.

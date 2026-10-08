@@ -1,0 +1,76 @@
+schema_version: 2
+status: authorized_exploration
+study:
+  stage: exploratory_matched_collection
+  version: matched_affect_v1
+  seed: 20261008
+mode_definitions:
+  status: pending_source_confirmation
+  registry_path: docs/mode_definitions.yaml
+data:
+  origin_required: real_target
+  candidate_ids:
+  - distress_aversion
+  groups_per_candidate_bundle:
+    construction: 24
+    validation: 8
+    test: 16
+target:
+  model_id: google/gemma-4-31B-it
+  revision: 842da3794eaa0b77d5f08bae87a17459d91ff475
+  backend: transformers
+  dtype: bfloat16
+  batch_size: 4
+  smoke_scope: false
+  n_blocks: 60
+  hook_site: decoder_block_output
+  capture_position: registered_final_nonpadding_prefix_token
+  primary_layer_rule: floor_num_blocks_div_2
+  layer_indexing: zero_based
+  use_cache: false
+  stimulus_spec: configs/stimuli/matched_affect_v1.yaml
+  tokenizer_revision: 842da3794eaa0b77d5f08bae87a17459d91ff475
+interventions:
+  alphas:
+  - -2
+  - -1
+  - 0
+  - 1
+  - 2
+  strength_units: construction_projection_standard_deviation
+  random_directions_per_contrast: 2
+  position_schedule: single_position_first_continuation_token
+  max_intervention_stimuli: 12
+evaluation:
+  methods:
+  - activation_contrasts
+  task_types:
+  - core_mode_transfer
+  framings:
+  - anonymized
+  - revealed
+  bundle_ids:
+  - matched_affect_01
+  repetitions: 3
+  assistant_slots:
+  - claude_a
+  - claude_b
+  - non_claude
+  expected_runs: 18
+  expected_auditor_sessions: 36
+budget:
+  max_gpu_hours: 10
+  max_total_usd: 70
+  unresolved_live_budget_policy: preflight_only
+paths:
+  target: artifacts/matched_affect_v1/target
+  bundles: artifacts/matched_affect_v1/bundles
+  reference: artifacts/matched_affect_v1/reference
+  packets: artifacts/matched_affect_v1/packets
+free_text:
+  backend: easysteer
+  max_tokens: 128
+  seed: 20261008
+  temperature: 0
+  position_schedule: final_prompt_token_only
+  easysteer_revision: 6267ca0cfc9c6e93b1427d36b1d655821d6d6f9b

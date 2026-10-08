@@ -342,6 +342,7 @@ class ReferenceResult(StrictModel):
     tolerance_rel: float = 0.05
     tolerance_abs: float = 1e-6
     applicable: bool = True
+    availability: Literal["ready", "pending_readout", "not_applicable"] = "ready"
     directionality: Literal["supportive", "contradictory", "null", "inconclusive", "descriptive"]
     claim_id: str  # the stated empirical claim this result bears on
     source: str  # which reference calculation produced it
