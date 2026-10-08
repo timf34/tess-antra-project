@@ -108,8 +108,9 @@ def generate(cfg, backend="easysteer", engine=None):
                             for rendered in rendered_batch
                         ]
                     else:
+                        # EasySteer's resolver accepts None (unsteered) or a SteeringSpec; False is not iterable.
                         steer = (
-                            False
+                            None
                             if u is None
                             else SteeringSpec(
                                 vectors=[
