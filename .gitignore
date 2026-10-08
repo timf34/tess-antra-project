@@ -1,0 +1,21 @@
+# secrets
+.env
+*.local.env
+# environments
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# large/generated study artifacts (use the artifact store for these)
+artifacts/*
+!artifacts/.gitkeep
+runs/*
+!runs/.gitkeep
+reports/*
+!reports/.gitkeep
+!reports/README.md
+# corpus imports (never commit raw transcripts)
+corpus/imported/
+# os
+.DS_Store

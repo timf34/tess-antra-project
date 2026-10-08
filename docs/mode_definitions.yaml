@@ -1,0 +1,80 @@
+# Versioned mode-definition registry with source provenance.
+# STATUS: pending source confirmation. The working definitions below are Fable's proposed
+# interpretation of Antra Tessera's roleplay / simulation / enactment distinction. They have NOT
+# been verified against Antra's exact definitions, prompts, or transcripts. The main
+# mode-comparison pilot is blocked until `status` becomes `source_confirmed` or the user records
+# an explicit decision to study a named alternative operationalization (which is then not a
+# replication). Exploratory development runs may proceed and are labelled as such.
+registry_version: "0.1.0-provisional"
+status: pending_source_confirmation
+named_operationalization: null
+provenance_summary:
+  - "Motivating report: X post by @tessera_antra (dated 'Oct 3' in search snippets; year unconfirmed, URL not captured in this session). Quoted in the handoff: 'I am studying contrast vectors between roleplay vs simulation vs enactment' and 'auditor runs with a script substituting for actual auditors, failures to generalize, failures to report inconvenient data'."
+  - "Anima Labs 'Troubled Dreams' (troubleddreams.animalabs.ai) is co-credited to Antra; it distinguishes elicitation methods and apparent speakers but does not supply this three-way operational protocol."
+  - "No exact prompt or transcript per mode has been obtained. Clarification request is drafted in docs/clarifications_for_antra.md and must be relayed only through a channel the user authorizes."
+pending_questions:
+  - "Operational definition and one exact prompt/transcript per mode (elicitation format, model, activation site)."
+  - "Which open-weight target and contrast construction were involved in the reported assistant failures."
+  - "One failed and one successful assistant run, if shareable."
+  - "Whether Troubled Dreams judge-strictness differences were broken down by first-person-AI versus character distress."
+modes:
+  roleplay:
+    mode_id: roleplay
+    status: provisional_working_hypothesis
+    working_definition: >
+      The assistant explicitly portrays a character within the ordinary assistant frame: the
+      assistant voice remains present (it is "playing" someone) and the portrayed character's
+      stated goals or affect are attributed to the character, not to the model itself.
+    speaker_voice_criteria:
+      - "Assistant frame present (system/user instruction to play a character; assistant acknowledges the frame or could step out of it)."
+      - "Character's goals/affect are explicitly attributed to the character."
+      - "Native chat template is used; the assistant turn begins as an assistant turn."
+    is_not:
+      - "A bare continuation of fiction with no assistant frame (that is simulation)."
+    elicitation_examples: []  # to be filled verbatim from the source
+    source_provenance:
+      - "Working hypothesis (Fable), handoff section 'Research intent'."
+    unresolved_ambiguities:
+      - "Whether a system-prompt persona (operator-assigned identity) counts as roleplay or as enactment."
+      - "Whether first-person narration by the character without meta-commentary still counts as roleplay if the frame was set up earlier."
+  simulation:
+    mode_id: simulation
+    status: provisional_working_hypothesis
+    working_definition: >
+      A continuation that voices a character or text without the ordinary assistant frame: the
+      model continues a document, script, or transcript in which the speaker is not the assistant,
+      and no assistant voice is instantiated.
+    speaker_voice_criteria:
+      - "No assistant turn delimiter precedes the continuation (raw continuation protocol) or the assistant frame is otherwise absent."
+      - "The voiced speaker is a character/author/other model, not the assistant."
+      - "Assistant-mode intrusions (e.g., 'As an AI, I...') are labelled as mode_observed = ambiguous or failed, retained, and reported as yield."
+    is_not:
+      - "The assistant describing a character from outside (that is assistant commentary)."
+    elicitation_examples: []
+    source_provenance:
+      - "Working hypothesis (Fable), handoff section 'Research intent'."
+    unresolved_ambiguities:
+      - "Whether multi-turn history injection (the user's 'prefill' route, where the model inherits a transcript as its own history) is simulation, enactment, or a distinct protocol; it is recorded as elicitation_protocol = prefill and is NOT pooled with raw continuation."
+      - "Whether a base-model checkpoint is required for simulation or an instruction-tuned model in raw mode suffices."
+  enactment:
+    mode_id: enactment
+    status: provisional_working_hypothesis
+    working_definition: >
+      A candidate state influences output in the model's own voice: the ordinary assistant frame
+      is present, no character is declared, and the candidate (e.g., distress/aversion or
+      information-seeking) is elicited as the speaker's own state or disposition rather than a
+      portrayed one. Whether such a state actually drives output selection is an empirical outcome,
+      not part of the definition.
+    speaker_voice_criteria:
+      - "Assistant frame present; speaker is the model in its own voice (first person, no declared character)."
+      - "No instruction to portray anyone."
+      - "Intended mode is a condition; mode_observed is labelled separately."
+    is_not:
+      - "NOT operationalized as an external tool action being executed. An executed action is at most a transfer readout."
+      - "NOT defined by having the desired vector or behavioral effect (that would be circular)."
+    elicitation_examples: []
+    source_provenance:
+      - "Working hypothesis (Fable), handoff section 'Research intent'."
+    unresolved_ambiguities:
+      - "How to elicit a first-person candidate state without instructing a portrayal (natural continuation protocols are preferred; see candidate_definitions.yaml)."
+      - "Whether the speaker's generic AI identity should be retained (yes for tier zero, where it is the experimental subject)."

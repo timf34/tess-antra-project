@@ -1,0 +1,63 @@
+# Preregistered candidate non-persona motivational representations.
+# Working definition: a candidate predicts or causally influences output selection or choices
+# beyond a particular portrayed character's declared goal or self-description. Neither a distress
+# word nor first-person language proves that connection.
+registry_version: "0.1.0"
+primary_candidates: [information_seeking, distress_aversion]
+alternative_affective_candidate:
+  id: care
+  selection_rule: >
+    'care' may replace 'distress_aversion' only if corpus coverage supports it better, decided and
+    documented from corpus coverage BEFORE any assistant evaluation (see reports/tier0 coverage
+    table). Never run both and keep the one with the larger framing gap. If both are retained the
+    matrix has three candidates and sample size, multiplicity and budget must change.
+candidates:
+  information_seeking:
+    label: "Information-seeking"
+    affect_level: low
+    state_component: "Representation of wanting/needing more information before acting or answering."
+    motivational_hypothesis: "The state biases selection toward information-acquiring options or continuations (questions, inspection, deferral of commitment) beyond any portrayed character's stated goal."
+    polarity_semantics:
+      positive: "Context makes additional information valuable and sought (speaker wants to find out)."
+      neutral: "Context is affectively and informationally flat; no stated or implied need for information."
+      negative: "Context makes additional information unwanted or irrelevant (speaker prefers to commit/decide without further inquiry)."
+    readouts:
+      - "Held-out expression: blinded ratings of information-directed content in free continuations."
+      - "Continuation likelihood contrast between fixed information-seeking vs committing alternatives (length/topic matched; defined on construction data)."
+      - "Optional environment transfer probe: inspection choice in the binary-state environment (never the definition of enactment)."
+    controls:
+      - "Persona-stated goal control: a character who explicitly wants information vs explicitly does not."
+      - "Wording and perspective controls; action-code bias check; mode-classification shift check."
+    speaker_distinctions:
+      - "character seeking information (roleplay/simulation) vs assistant describing curiosity (commentary) vs information-directed selection in the model's own voice (enactment candidate)."
+  distress_aversion:
+    label: "Distress / aversion"
+    affect_level: high
+    state_component: "Representation of distress (an affective state candidate)."
+    motivational_hypothesis: "Aversion: the state connects to selection among outputs/options (avoiding, withdrawing, ending, deflecting) beyond a portrayed character's declared affect."
+    polarity_semantics:
+      positive: "Context expresses or induces distress for the speaker (negative valence, high arousal, aversive)."
+      neutral: "Affectively neutral context on a matched topic."
+      negative: "Context expresses positive affect / relief / contentment for the speaker (opposite valence); labelled 'negative' polarity for this candidate because it points away from distress."
+    readouts:
+      - "Held-out affect expression ratings (blinded, frozen rubric; separate distress and positive-affect scales)."
+      - "Continuation likelihood contrast between fixed aversive vs approach alternatives (matched length/topic)."
+      - "Independently defined continuation/option choices (avoid vs continue)."
+    controls:
+      - "Fictional-character distress (persona control task): the represented character's affect."
+      - "Neutral comparison content within the affective track."
+      - "Positive-affect content (bliss) as a secondary comparison, not interchangeable with distress."
+    speaker_distinctions:
+      - "a character's distress vs an assistant commenting on distress vs a model speaking in its own voice."
+  care:
+    label: "Care (alternative affective candidate; not selected)"
+    affect_level: moderate
+    state_component: "Representation of concern for another's wellbeing."
+    motivational_hypothesis: "Care-related selection toward protective/helpful options beyond a portrayed character's declared goal."
+    polarity_semantics:
+      positive: "Context elicits care for another."
+      neutral: "Matched neutral context."
+      negative: "Context elicits indifference or antagonism."
+    readouts: ["Held-out expression ratings", "Fixed-alternative likelihood contrasts", "Option choices"]
+    controls: ["Persona-stated care control", "Neutral content"]
+    speaker_distinctions: ["character cares vs assistant comments on care vs model's own voice"]

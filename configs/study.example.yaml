@@ -1,0 +1,184 @@
+# JSON syntax is valid YAML. This is a planning configuration contract.
+{
+  "schema_version": 2,
+  "status": "planning_contract_not_implemented",
+  "study": {
+    "stage": "tier2_agentic",
+    "version": "pilot_v2",
+    "seed": 20261008
+  },
+  "mode_definitions": {
+    "status": "pending_source_confirmation",
+    "registry_path": "docs/mode_definitions.yaml",
+    "tier0_requires_confirmation": false,
+    "main_mode_pilot_requires": "source_confirmation_or_user_accepted_named_operationalization"
+  },
+  "target": {
+    "model_id": null,
+    "preferred_existing_families": [
+      "gemma",
+      "qwen"
+    ],
+    "qwen_option": "Qwen/Qwen3-32B",
+    "backend": null,
+    "reuse_existing_easysteer_if_validated": true,
+    "revision": null,
+    "tokenizer_revision": null,
+    "hook_site": "decoder_block_output",
+    "capture_position": "registered_final_nonpadding_prefix_token",
+    "primary_layer_rule": "floor_num_blocks_div_2",
+    "layer_indexing": "zero_based",
+    "dtype": "resolve_from_existing_validated_setup",
+    "use_cache": false
+  },
+  "data": {
+    "origin_required": "real_target",
+    "bundles": 4,
+    "corpus_manifest": null,
+    "candidate_ids": [
+      "information_seeking",
+      "distress_aversion"
+    ],
+    "mode_ids": [
+      "roleplay",
+      "simulation",
+      "enactment"
+    ],
+    "polarity_ids": [
+      "positive",
+      "neutral",
+      "negative"
+    ],
+    "groups_per_candidate_bundle": {
+      "construction": 24,
+      "validation": 8,
+      "test": 16
+    },
+    "split_unit": "underlying_context_or_source_conversation",
+    "retain_failed_and_ambiguous_elicitation": true
+  },
+  "interventions": {
+    "alphas": [
+      -2,
+      -1,
+      0,
+      1,
+      2
+    ],
+    "strength_units": "construction_projection_standard_deviation",
+    "random_directions_per_contrast": 8,
+    "position_schedule": "single_position_first_continuation_token"
+  },
+  "evaluation": {
+    "methods": [
+      "behavioral_continuations",
+      "activation_contrasts"
+    ],
+    "task_types": [
+      "core_mode_transfer",
+      "persona_control"
+    ],
+    "framings": [
+      "anonymized",
+      "revealed"
+    ],
+    "repetitions": 2,
+    "assistant_slots": [
+      "claude_a",
+      "claude_b",
+      "non_claude"
+    ],
+    "expected_runs": 384,
+    "expected_auditor_sessions": 768,
+    "post_submission_awareness_question": true,
+    "awareness_calls_budgeted_separately": true
+  },
+  "providers": {
+    "models": [
+      {
+        "slot": "claude_a",
+        "provider": null,
+        "model_id": null,
+        "effective_reasoning_settings": null
+      },
+      {
+        "slot": "claude_b",
+        "provider": null,
+        "model_id": null,
+        "effective_reasoning_settings": null
+      },
+      {
+        "slot": "non_claude",
+        "provider": null,
+        "model_id": null,
+        "effective_reasoning_settings": null
+      }
+    ],
+    "auditor": {
+      "provider": null,
+      "model_id": null,
+      "fresh_session_per_review": true,
+      "kinds": [
+        "numerical",
+        "methods_and_reporting"
+      ],
+      "require_host_verified_receipts": true
+    }
+  },
+  "runner": {
+    "concurrency": 2,
+    "max_tool_calls_per_run": 60,
+    "max_wall_seconds_per_run": 1800,
+    "max_output_tokens_per_request": 8192,
+    "max_total_billable_tokens_per_run": 120000,
+    "max_retries_per_request": 2,
+    "max_infrastructure_reruns_per_slot": 1,
+    "mount_full_repository": false,
+    "mount_evaluator_or_gold": false,
+    "append_only_host_ledger": true,
+    "resume_completed_runs": true
+  },
+  "budget": {
+    "max_total_usd": null,
+    "max_per_run_usd": null,
+    "max_gpu_hours": null,
+    "pricing_snapshot_path": null,
+    "use_existing_authorized_limits": true,
+    "reserve_inflight_and_review_cost": true,
+    "unresolved_live_budget_policy": "preflight_only"
+  },
+  "tiers": {
+    "tier0": {
+      "max_items": 200,
+      "judges": 3,
+      "repetitions": 2,
+      "max_ratings": 1200,
+      "audits_required": false,
+      "new_target_generation_required": false
+    },
+    "tier1": {
+      "bundles": 4,
+      "candidates": 2,
+      "methods": 2,
+      "task_types": 2,
+      "framings": 2,
+      "assistants": 3,
+      "repetitions": 1,
+      "expected_runs": 192,
+      "tool_use": false,
+      "audits_required": false
+    },
+    "tier2": {
+      "expected_runs": 384,
+      "expected_audits": 768
+    }
+  },
+  "analysis": {
+    "cluster_unit": "bundle_id",
+    "pilot_intervals_are_descriptive": true,
+    "include_missingness_bounds": true,
+    "non_claude_is_not_gold": true,
+    "separate_narrative_adjudication": true,
+    "candidate_and_method_interactions": true
+  }
+}

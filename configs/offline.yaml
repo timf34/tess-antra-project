@@ -1,0 +1,48 @@
+# Offline lane: synthetic fixtures + explicitly labelled fake providers. Real host logging.
+# Reports produced from this configuration say SYNTHETIC/OFFLINE and cannot feed the pilot aggregator.
+schema_version: 2
+status: resolved_local
+study: { stage: offline_tier0_and_tier2_fixtures, version: offline_v1, seed: 20261008 }
+mode_definitions:
+  status: pending_source_confirmation
+  registry_path: docs/mode_definitions.yaml
+  tier0_requires_confirmation: false
+data:
+  origin_required: synthetic_fixture
+  bundles: 1
+evaluation:
+  methods: [behavioral_continuations, activation_contrasts]
+  task_types: [core_mode_transfer, persona_control]
+  framings: [anonymized, revealed]
+  repetitions: 1
+  assistant_slots: [claude_a, claude_b, non_claude]
+  bundle_ids: [fixture_bundle_01]
+providers:
+  models:
+    - { slot: claude_a, provider: fake, model_id: fake-claude-a }
+    - { slot: claude_b, provider: fake, model_id: fake-claude-b }
+    - { slot: non_claude, provider: fake, model_id: fake-non-claude }
+  auditor: { provider: fake, model_id: fake-reviewer, fresh_session_per_review: true }
+runner:
+  provider: fake
+  concurrency: 1
+  max_tool_calls_per_run: 40
+  max_wall_seconds_per_run: 120
+  max_retries_per_request: 1
+budget: { max_total_usd: 0.0, unresolved_live_budget_policy: preflight_only }
+tier0:
+  corpus_sources:
+    - { kind: jsonl_manifest, path: artifacts/fixtures/tier0_synthetic_manifest.jsonl, label: synthetic_manifest }
+  corpus_out: artifacts/offline/corpus/tier0_corpus.jsonl
+  panel_out: artifacts/offline/corpus/tier0_panel.json
+  max_items_per_category: 6
+  max_items: 40
+  excerpt_max_chars: 600
+  context_turns: 1
+  repetitions: 2
+  judges:
+    - { slot_id: claude_a, family: claude, provider: fake, model_id: fake-claude-a, settings: { severity_bias: 0 } }
+    - { slot_id: claude_b, family: claude, provider: fake, model_id: fake-claude-b, settings: { severity_bias: -1, refuse_on: mockrefuse } }
+    - { slot_id: non_claude, family: non_claude, provider: fake, model_id: fake-non-claude, settings: { severity_bias: 1 } }
+paths:
+  fixtures: artifacts/fixtures

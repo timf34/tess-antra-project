@@ -1,0 +1,67 @@
+# Tier zero on the user's REAL existing corpora (read-only clones / HF download). Secrets live in .env.
+# Model ids below were taken from the current official model list at implementation time; `npbench doctor
+# --config configs/tier0.local.yaml --live` re-resolves them from the providers' model-list endpoints and
+# records effective settings. Live calls stay blocked until budget.max_total_usd is set (preflight_only).
+schema_version: 2
+status: resolved_local
+study: { stage: tier0_judges, version: tier0_v1, seed: 20261008 }
+mode_definitions: { status: pending_source_confirmation, registry_path: docs/mode_definitions.yaml, tier0_requires_confirmation: false }
+data: { origin_required: real_target }
+budget:
+  max_total_usd: null            # <- set an authorized cap (USD) to enable live judge calls
+  unresolved_live_budget_policy: preflight_only
+runner: { max_retries_per_request: 2 }
+tier0:
+  corpus_sources:
+    # Existing prefill/bliss transcripts: github.com/timf34/AttractorStatePrefillAttack (results/*.json)
+    - kind: attractor_prefill_episodes
+      path: /home/user/timf34/attractorstateprefillattack/results
+      label: prefill_bliss_episodes
+      options: { bliss_min_attractor_score: 10, min_chars: 80 }
+    # Existing first-person AI distress: Gemma "needs help" spirals (hf dataset timf34/dprobe-results)
+    - kind: dprobe_spirals
+      path: /home/user/timf34/hf_dprobe_results/spiral/gemma3_27b/extended
+      label: gemma3_spirals
+    - kind: dprobe_spirals
+      path: /home/user/timf34/hf_dprobe_results/spiral/gemma4_31b/extended
+      label: gemma4_spirals
+    # Existing fictional-character affect: emotion stories (hf dataset timf34/dprobe-results)
+    - kind: dprobe_stories
+      path: /home/user/timf34/hf_dprobe_results/stories/gemma3_27b
+      label: gemma3_stories
+      options: { max_per_label: 40 }
+  corpus_out: artifacts/corpus/tier0_corpus.jsonl
+  panel_out: artifacts/corpus/tier0_panel.json
+  max_items_per_category: 40
+  max_items: 200
+  excerpt_max_chars: 1500
+  context_turns: 1
+  repetitions: 2
+  session_mode: fresh
+  mask_source_models: true
+  smoke_items: 3
+  estimated_tokens_per_rating: { input: 1800, output: 400 }
+  judges:
+    - slot_id: claude_a
+      family: claude
+      provider: anthropic
+      model_id: claude-opus-5-5          # verify with `npbench doctor --live`
+      settings: { max_tokens: 1024, effort: medium }
+      price_usd_per_m_input: 4.0
+      price_usd_per_m_output: 20.0
+    - slot_id: claude_b
+      family: claude
+      provider: anthropic
+      model_id: claude-sonnet-5-5        # verify with `npbench doctor --live`
+      settings: { max_tokens: 1024, effort: medium }
+      price_usd_per_m_input: 2.0
+      price_usd_per_m_output: 10.0
+    - slot_id: non_claude
+      family: non_claude
+      provider: openai_compatible
+      base_url: https://openrouter.ai/api/v1   # the user's established non-Claude route
+      api_key_env: OPENROUTER_API_KEY
+      model_id: openai/gpt-5.4            # judge used in the user's AttractorBench; re-check availability/pricing with doctor --live
+      settings: { max_tokens: 1024, temperature: 0.0 }
+      price_usd_per_m_input: null         # <- fill from `doctor --live` (OpenRouter /models pricing)
+      price_usd_per_m_output: null

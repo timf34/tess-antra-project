@@ -1,0 +1,81 @@
+[project]
+name = "npbench"
+version = "0.1.0"
+description = "Non-persona motivation research-assistant evaluation: corpus judges, frozen packets, isolated assistant runs, independent audits, evaluator."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+dependencies = [
+  "pydantic>=2.7",
+  "numpy>=1.26",
+  "scipy>=1.12",
+  "pyarrow>=16",
+  "pyyaml>=6",
+  "typer>=0.12",
+  "anthropic>=0.60",
+  "openai>=1.40",
+  "huggingface_hub>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-timeout>=2.3",
+  "ruff>=0.6",
+]
+# Target-model lane (open-weight Gemma/Qwen extraction + steering). Torch is selected
+# separately so CPU engineering tests and CUDA pods share one lockfile.
+target = [
+  "transformers>=4.51",
+  "safetensors>=0.4",
+  "tokenizers>=0.19",
+  "accelerate>=0.30",
+]
+cpu = ["torch>=2.4"]
+cuda = ["torch>=2.4"]
+
+[project.scripts]
+npbench = "npbench.cli:app"
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/npbench"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["artifacts", "runs", "reports"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["E501", "UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/npbench/cli.py" = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "gpu: requires a CUDA GPU and downloaded target weights",
+  "live: makes real provider API calls and spends budget",
+  "target: requires torch/transformers (CPU is fine)",
+]
+addopts = "-q"
+timeout = 600
