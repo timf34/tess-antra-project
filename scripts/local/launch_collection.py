@@ -172,7 +172,12 @@ def main():
     finally:
         if statefile.exists():
             try:
-                rp("logs", NAME, "--job", "collection", "-n", "100", capture=True, timeout=30)
+                # Keep the complete traceback before stopping wipes the container runtime.
+                rp(
+                    "scp", NAME, "pod:/workspace/collection.log",
+                    str(ART / f"collection_{sha[:12]}_{int(time.time())}.log"),
+                    timeout=90,
+                )
             except Exception:
                 pass
             # Stop on failure to preserve persistent diagnostics; delete only after verified downloads/upload.
