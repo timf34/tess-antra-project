@@ -15,6 +15,11 @@ runs/*
 reports/*
 !reports/.gitkeep
 !reports/README.md
+!reports/*.md
+!reports/offline/
+!reports/offline/*.md
+!reports/offline_tier0/
+!reports/offline_tier0/*.md
 # corpus imports (never commit raw transcripts)
 corpus/imported/
 # os

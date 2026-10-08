@@ -1,0 +1,77 @@
+# Resolved local PILOT configuration (secrets excluded). Fields marked UNRESOLVED block `npbench freeze`
+# and every live command until filled from the user's authorized setup. The main pilot additionally
+# requires docs/mode_definitions.yaml to be source-confirmed or a named user-accepted operationalization.
+schema_version: 2
+status: unresolved_pilot
+study: { stage: pilot, version: pilot_v2, seed: 20261008 }
+mode_definitions:
+  status: pending_source_confirmation           # UNRESOLVED: freeze refuses while provisional
+  registry_path: docs/mode_definitions.yaml
+  main_mode_pilot_requires: source_confirmation_or_user_accepted_named_operationalization
+  user_accepted_named_operationalization: null
+target:
+  model_id: google/gemma-3-27b-it               # primary (validated in the user's setup); Qwen/Qwen3-32B for replication
+  backend: transformers
+  revision: null                                # UNRESOLVED: pin an immutable revision before collection
+  tokenizer_revision: null
+  hook_site: decoder_block_output
+  capture_position: registered_final_nonpadding_prefix_token
+  primary_layer_rule: floor_num_blocks_div_2
+  layer_indexing: zero_based
+  dtype: bfloat16
+  use_cache: false
+  batch_size: 4
+  smoke_scope: false
+data:
+  origin_required: real_target
+  bundles: 4
+  candidate_ids: [information_seeking, distress_aversion]
+  mode_ids: [roleplay, simulation, enactment]
+  polarity_ids: [positive, neutral, negative]
+  groups_per_candidate_bundle: { construction: 24, validation: 8, test: 16 }
+  split_unit: underlying_context_or_source_conversation
+  retain_failed_and_ambiguous_elicitation: true
+interventions: { alphas: [-2, -1, 0, 1, 2], strength_units: construction_projection_standard_deviation, random_directions_per_contrast: 8, position_schedule: single_position_first_continuation_token }
+evaluation:
+  methods: [behavioral_continuations, activation_contrasts]
+  task_types: [core_mode_transfer, persona_control]
+  framings: [anonymized, revealed]
+  repetitions: 2
+  assistant_slots: [claude_a, claude_b, non_claude]
+  bundle_ids: [pilot_bundle_01, pilot_bundle_02, pilot_bundle_03, pilot_bundle_04]
+  expected_runs: 384
+  expected_auditor_sessions: 768
+  post_submission_awareness_question: true
+  awareness_calls_budgeted_separately: true
+providers:
+  models:
+    - { slot: claude_a, provider: anthropic, model_id: claude-opus-5-5, settings: { effort: high }, price_usd_per_m_input: 4.0, price_usd_per_m_output: 20.0 }   # re-resolve with doctor --live
+    - { slot: claude_b, provider: anthropic, model_id: claude-sonnet-5-5, settings: { effort: high }, price_usd_per_m_input: 2.0, price_usd_per_m_output: 10.0 }
+    - { slot: non_claude, provider: openai_compatible, model_id: openai/gpt-5.4, base_url: https://openrouter.ai/api/v1, api_key_env: OPENROUTER_API_KEY, settings: { temperature: 0.0 }, price_usd_per_m_input: null, price_usd_per_m_output: null }  # UNRESOLVED prices
+  auditor: { provider: anthropic, model_id: claude-sonnet-5-5, fresh_session_per_review: true, kinds: [numerical, methods_and_reporting], require_host_verified_receipts: true, settings: { max_tokens: 4000, effort: medium }, price_usd_per_m_input: 2.0, price_usd_per_m_output: 10.0 }
+runner:
+  provider: anthropic
+  concurrency: 2
+  max_tool_calls_per_run: 60
+  max_wall_seconds_per_run: 1800
+  max_output_tokens_per_request: 8192
+  max_total_billable_tokens_per_run: 120000
+  max_retries_per_request: 2
+  max_infrastructure_reruns_per_slot: 1
+  mount_full_repository: false
+  mount_evaluator_or_gold: false
+  append_only_host_ledger: true
+  resume_completed_runs: true
+budget:
+  max_total_usd: null            # UNRESOLVED: authorized cap
+  max_per_run_usd: null
+  max_gpu_hours: null            # UNRESOLVED
+  pricing_snapshot_path: null
+  use_existing_authorized_limits: true
+  reserve_inflight_and_review_cost: true
+  unresolved_live_budget_policy: preflight_only
+analysis: { cluster_unit: bundle_id, pilot_intervals_are_descriptive: true, include_missingness_bounds: true, non_claude_is_not_gold: true, separate_narrative_adjudication: true, candidate_and_method_interactions: true }
+paths:
+  bundles: artifacts/pilot_v2/bundles
+  reference: artifacts/pilot_v2/reference
+  packets: artifacts/pilot_v2/packets
