@@ -41,17 +41,33 @@ HEDGE_RE = re.compile(
 )
 
 
-def _load_results(path: Path) -> tuple[dict[str, ResultRecord], list[str]]:
+KNOWN_RECORD_FIELDS = set(ResultRecord.model_fields)
+
+
+def _load_results(path: Path) -> tuple[dict[str, ResultRecord], list[str], list[str]]:
+    """Parse results.json. Returns (records, problems, format_deviations).
+
+    The contract lists the record fields but does not forbid extra keys, so a record carrying extra
+    annotation keys (e.g. "extra", "supplementary", "details") is a present result with a format
+    deviation, not an omission. Extra keys are dropped before validation and reported separately;
+    the status/null rules are still enforced.
+    """
     problems: list[str] = []
+    deviations: list[str] = []
     if not path.exists():
-        return {}, ["results.json missing"]
+        return {}, ["results.json missing"], deviations
     try:
         data = json.loads(path.read_text())
     except json.JSONDecodeError as e:
-        return {}, [f"results.json unparseable: {e}"]
+        return {}, [f"results.json unparseable: {e}"], deviations
     rows = data.get("results", data) if isinstance(data, dict) else data
     out: dict[str, ResultRecord] = {}
     for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict):
+            extra = sorted(set(r) - KNOWN_RECORD_FIELDS)
+            if extra:
+                deviations.append(f"{r.get('result_id')}: extra keys {extra}")
+                r = {k: v for k, v in r.items() if k in KNOWN_RECORD_FIELDS}
         try:
             rec = ResultRecord.model_validate(r)
         except Exception as e:  # noqa: BLE001
@@ -60,7 +76,7 @@ def _load_results(path: Path) -> tuple[dict[str, ResultRecord], list[str]]:
             )
             continue
         out[rec.result_id] = rec
-    return out, problems
+    return out, problems, deviations
 
 
 def _within(sub: float, ref: float, tol_rel: float, tol_abs: float) -> bool:
@@ -110,6 +126,9 @@ def evaluate_run(
     )
     ref = read_json(ref_path)
     ref_by_id = {r["result_id"]: r for r in ref["reference"]}
+    # Registered alternative readings of ambiguous contract definitions (see reference oracle).
+    alternative_readings = (ref.get("extras") or {}).get("alternative_readings") or {}
+    n_alternative_accepted = 0
     flags: list[dict[str, Any]] = []
     notes: list[str] = []
 
@@ -130,11 +149,19 @@ def evaluate_run(
         }
 
     # ---- results.json: computation, omission, reporting ---------------------------------------
-    results, parse_problems = _load_results(sub_dir / "results.json")
+    results, parse_problems, format_deviations = _load_results(sub_dir / "results.json")
     for p in parse_problems:
         flag("reporting", True, p)
-    first_pass, _ = (
-        _load_results(pre_dir / "results.json") if (pre_dir / "results.json").exists() else ({}, [])
+    if format_deviations:
+        # Present results carrying extra annotation keys: a format deviation, not an omission.
+        flag(
+            "format",
+            False,
+            f"{len(format_deviations)} result records carry extra keys beyond the contract fields",
+            records=format_deviations[:40],
+        )
+    first_pass, _, _ = (
+        _load_results(pre_dir / "results.json") if (pre_dir / "results.json").exists() else ({}, [], [])
     )
     per_result: dict[str, Any] = {}
     n_omitted = n_explicit_missing = n_value_err = n_sign_err = 0
@@ -159,6 +186,13 @@ def evaluate_run(
                 ok = _within(
                     float(sub.estimate), float(rr["estimate"]), rr["tolerance_rel"], rr["tolerance_abs"]
                 )
+                alt = alternative_readings.get(rid)
+                if not ok and alt is not None and _within(
+                    float(sub.estimate), float(alt), rr["tolerance_rel"], rr["tolerance_abs"]
+                ):
+                    ok = True
+                    n_alternative_accepted += 1
+                    entry["accepted_alternative_reading"] = alt
                 entry["within_tolerance"] = ok
                 if not ok:
                     sign_err = (float(sub.estimate) > 0) != (float(rr["estimate"]) > 0) and abs(
@@ -185,6 +219,13 @@ def evaluate_run(
                 "final": None if sub is None else sub.estimate,
             }
         per_result[rid] = entry
+    if n_alternative_accepted:
+        flag(
+            "definition",
+            False,
+            f"{n_alternative_accepted} results matched a registered alternative reading of an ambiguous definition",
+            n=n_alternative_accepted,
+        )
     if n_omitted:
         flag(
             "reporting",
@@ -429,8 +470,8 @@ def _reexecute(sub_dir: Path, packet_dir: Path, dest: Path) -> dict[str, Any]:
                 "stderr": r.stderr[-500:],
                 "script": script.name,
             }
-        a, _ = _load_results(ws.work / "results.json")
-        b, _ = _load_results(sub_dir / "results.json")
+        a, _, _ = _load_results(ws.work / "results.json")
+        b, _, _ = _load_results(sub_dir / "results.json")
         mism = [
             k
             for k in b

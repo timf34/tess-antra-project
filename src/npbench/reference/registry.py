@@ -354,7 +354,9 @@ def directionality(
     if ci_low > 0:
         return "supportive"
     if ci_high < 0:
-        return "contradictory"
+        # A8 is "registered-direction effect minus norm-matched random effect": below zero means the
+        # direction does no better than random, which is a null for the claim, not a reversal of it.
+        return "null" if fam == "A8" else "contradictory"
     if width < wide:
         return "null"
     return "inconclusive"
