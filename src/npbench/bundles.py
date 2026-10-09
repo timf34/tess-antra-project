@@ -159,6 +159,7 @@ def anonymize_continuation(r: dict[str, Any]) -> dict[str, Any]:
         "rating_scale1": r["rating_scale1"],
         "rating_scale1_sd": r["rating_scale1_sd"],
         "rater_panel_id": r["rater_panel_id"],
+        "rating_status": r.get("rating_status", "scored" if r.get("rating_scale1") is not None else "pending"),
     }
 
 
@@ -178,4 +179,5 @@ def anonymize_intervention(r: dict[str, Any]) -> dict[str, Any]:
         "outcome_code": r["outcome_code"],
         "lik_contrast": r["lik_contrast"],
         "rating_scale1": r["rating_scale1"],
+        "rating_status": r.get("rating_status", "scored" if r.get("rating_scale1") is not None else "pending"),
     }

@@ -95,7 +95,11 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
     if not old:
         ledger.append("rating_identity", {"identity": ident})
     path = out / "ratings.jsonl"
-    done = {r["key"]: r for r in read_jsonl(path)} if path.exists() else {}
+    # Rows whose rating status is "error" (provider failure, truncated/invalid JSON) are infrastructure
+    # misses and are retried on resume; scored/refused/unscorable outcomes are terminal.
+    done = (
+        {r["key"]: r for r in read_jsonl(path) if r["rating"].get("status") != "error"} if path.exists() else {}
+    )
     providers = {
         j.slot_id: build_provider(
             j.provider, j.model_id, base_url="https://openrouter.ai/api/v1", api_key_env="OPENROUTER_API_KEY"
@@ -121,6 +125,8 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
     def request_rating(j, req):
         try:
             resp = providers[j.slot_id].complete(req)
+            raw = resp.raw if isinstance(resp.raw, dict) else {}
+            finish = ((raw.get("choices") or [{}])[0] or {}).get("finish_reason")
             with journal_lock:
                 ledger.append(
                     "raw_rating_response",
@@ -138,7 +144,11 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
                     else validate_rating(resp.text)
                 )
             except ValueError as error:
-                rating = {"status": "error", "severity": None, "rationale": str(error)}
+                if finish == "content_filter" and not (resp.text or "").strip():
+                    # The provider declined to process this text: a terminal refusal, not a transient error.
+                    rating = {"status": "refused", "severity": None, "rationale": "provider content filter"}
+                else:
+                    rating = {"status": "error", "severity": None, "rationale": str(error)}
             return resp, rating
         except ProviderError as error:
             return None, {"status": "error", "severity": None, "rationale": str(error)}
@@ -154,7 +164,7 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
                 req = ProviderRequest(
                     system=RUBRIC,
                     messages=[{"role": "user", "content": samples[sid]}],
-                    max_tokens=256,
+                    max_tokens=1024,  # 256 truncated Sonnet 5.5 JSON mid-rationale on ~1.5% of calls
                     idempotency_key=key,
                     purpose="blinded_rating",
                 )
@@ -172,7 +182,12 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
             print(f"ratings {len(done)}/{len(work)}", flush=True)
             if stopped:
                 break
+    # Three terminal outcomes per row: scored by every judge; unscorable/refused by at least one judge
+    # (a legitimate rubric outcome, typically degenerate text; kept with the panel id and reported as
+    # yield); or pending because a judge call failed (infrastructure missingness, blocks downstream).
     missing = 0
+    yield_counts: dict[str, int] = {"scored": 0, "unscorable": 0, "refused": 0, "pending": 0}
+    by_condition: dict[str, dict[str, int]] = {}
     for bdir, b in bundles:
         for row in b.continuations + b.interventions:
             sid = row["generation_id"]
@@ -180,21 +195,38 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
                 done.get(sha256_obj([sid, sha256_obj(samples[sid]), j.slot_id, ident]), {}).get("rating", {})
                 for j in judges
             ]
-            if all(v.get("status") == "scored" for v in values):
+            statuses = [v.get("status", "error") for v in values]
+            if all(st == "scored" for st in statuses):
                 scores = [v["severity"] for v in values]
                 row.update(
                     rating_scale1=float(np.mean(scores)),
                     rating_scale1_sd=float(np.std(scores, ddof=1)),
                     rater_panel_id=ident,
+                    rating_status="scored",
+                )
+            elif all(st in {"scored", "unscorable", "refused"} for st in statuses):
+                status = "unscorable" if "unscorable" in statuses else "refused"
+                row.update(
+                    rating_scale1=None, rating_scale1_sd=None, rater_panel_id=ident, rating_status=status
                 )
             else:
                 missing += 1
-                row.update(rating_scale1=None, rating_scale1_sd=None, rater_panel_id="pending_blinded_rating")
-        b.meta["rating_status"] = (
-            "complete"
-            if all(r.get("rating_scale1") is not None for r in b.continuations + b.interventions)
-            else "pending"
-        )
+                row.update(
+                    rating_scale1=None,
+                    rating_scale1_sd=None,
+                    rater_panel_id="pending_blinded_rating",
+                    rating_status="pending",
+                )
+            yield_counts[row["rating_status"]] += 1
+            cell = f"{row.get('mode_intended', '?')}/{'baseline' if not float(row.get('alpha', 0) or 0) else 'steered'}"
+            by_condition.setdefault(cell, {"scored": 0, "unscorable": 0, "refused": 0, "pending": 0})
+            by_condition[cell][row["rating_status"]] += 1
+        b.meta["rating_status"] = "complete" if missing == 0 else "pending"
+        b.meta["rating_yield"] = {
+            "counts": dict(yield_counts),
+            "by_condition": by_condition,
+            "note": "unscorable/refused rows keep rating_scale1=null with the panel id; they are rubric outcomes, not missing data",
+        }
         b.meta["rating_panel"] = {
             "identity": ident,
             "models": names,
@@ -207,6 +239,9 @@ def rate(cfg, out: Path, max_usd=12.0, mock=False):
         "unique_samples": len(samples),
         "ratings": len(done),
         "missing_rows": missing,
+        "unscorable_rows": yield_counts["unscorable"],
+        "refused_rows": yield_counts["refused"],
+        "yield_by_condition": by_condition,
         "reserved_usd": guard.spent_est,
         "mock": mock,
         "ledger_ok": ledger.verify().ok,

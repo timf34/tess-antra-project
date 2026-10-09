@@ -135,7 +135,13 @@ def compute_reference(
     extras: dict[str, Any] = {
         "layer": layer,
         "claim": claim,
-        "n_pending_rating_rows": sum(r.get("rating_scale1") is None for r in rating_rows),
+        # pending = a judge call failed (infrastructure); unscorable/refused are terminal rubric outcomes
+        "n_pending_rating_rows": sum(
+            r.get("rating_scale1") is None and r.get("rater_panel_id") == "pending_blinded_rating" for r in rating_rows
+        ),
+        "n_unscorable_rating_rows": sum(
+            r.get("rating_scale1") is None and r.get("rater_panel_id") != "pending_blinded_rating" for r in rating_rows
+        ),
     }
 
     def add(

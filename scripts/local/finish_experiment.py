@@ -58,8 +58,10 @@ def main():
                 raise ValueError("Refusing mock or synthetic data in researcher experiment")
         status("blinded_ratings")
         ratings = rate(capture_cfg, ROOT / "runs/matched_affect_ratings", max_usd=20)
+        # missing_rows counts infrastructure misses only; unscorable/refused are terminal rubric outcomes and are reported.
         if ratings["missing_rows"] or not ratings["ledger_ok"]:
             raise RuntimeError(f"Ratings incomplete: {ratings}")
+        status("ratings_complete", **{k: ratings[k] for k in ("unscorable_rows", "refused_rows", "yield_by_condition")})
         from huggingface_hub import HfApi
 
         api = HfApi(token=os.environ["HF_TOKEN"])
@@ -98,7 +100,14 @@ Zero-strength control records share the corresponding baseline generation; they 
 replicates. Greedy continuations have a 128-token cap and retain finish reasons.
 
 Blinded text-expression ratings use Sonnet 5.5 and GPT-5.4-mini with the frozen 0–4 distress/aversion
-rubric stored in bundle metadata. The mean is an operational expression score. The reported standard
+rubric stored in bundle metadata. Rows where a judge returned `unscorable` or `refused` keep
+`rating_scale1 = null` with `rating_status` set accordingly; they are rubric outcomes, not missing data.
+In this bundle {ratings["unscorable_rows"]} rows are unscorable and {ratings["refused_rows"]} refused, almost all in the
+raw-continuation (simulation) condition, where greedy decoding of this instruction-tuned checkpoint frequently
+degenerates into repeated-word loops within 128 tokens, including at zero steering strength
+(yield by condition and strength: {ratings["yield_by_condition"]}). Activations were captured at the final
+prompt token before generation and are unaffected; the free-text expression readout for that condition rests on
+the scorable minority and should be read with that caveat. The mean is an operational expression score. The reported standard
 deviation measures disagreement between these two raters, not generation uncertainty. Raters see the
 text, which can itself reveal speaker cues, but do not receive condition labels or intervention strength.
 

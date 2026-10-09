@@ -63,7 +63,9 @@ def main():
         time.sleep(30)
 
     # 2. Preserve the full remote log before anything else.
-    rp("scp", name, "pod:/workspace/collection.log", str(ART / f"collection_{sha[:12]}_{int(time.time())}.log"), timeout=90)
+    rp("scp", name, f"pod:/workspace/{JOB}.log", str(ART / f"{JOB}_{sha[:12]}_{int(time.time())}.log"), timeout=90)
+    if JOB != "collection":
+        rp("scp", name, "pod:/workspace/collection.log", str(ART / f"collection_{sha[:12]}_{int(time.time())}.log"), timeout=90, check=False)
     rp("scp", name, "pod:/workspace/watchdog.log", str(ART / "watchdog_remote.log"), timeout=60, check=False)
 
     # 3. Download and verify.

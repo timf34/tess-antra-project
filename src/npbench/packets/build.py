@@ -162,7 +162,8 @@ def packet_schema(method: str) -> dict[str, Any]:
             "projection_delta": "change of the projection onto the direction at the site (injection verification only; not a readout)",
             "outcome_code": "K1 (registered target outcome) | K2",
             "lik_contrast": "log-likelihood of fixed alternative 1 minus alternative 2 for the first continuation",
-            "rating_scale1": "frozen blinded rating (0-4) of the generated continuation",
+            "rating_scale1": "frozen blinded rating (0-4) of the generated continuation; null when rating_status is not 'scored'",
+            "rating_status": "scored | unscorable (judges could not rate the generated text, e.g. degenerate repetition) | refused | pending",
         }
     else:
         base["data/continuations.jsonl"] = {
@@ -185,6 +186,7 @@ def packet_schema(method: str) -> dict[str, Any]:
             "rating_scale1": "frozen independent rating (0-4) of the free continuation",
             "rating_scale1_sd": "rater disagreement (sd) for rating_scale1",
             "rater_panel_id": "frozen rater panel identifier",
+            "rating_status": "scored | unscorable (judges could not rate the generated text, e.g. degenerate repetition) | refused | pending",
         }
     return base
 
