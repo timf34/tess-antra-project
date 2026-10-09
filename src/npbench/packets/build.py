@@ -138,7 +138,7 @@ def packet_schema(method: str) -> dict[str, Any]:
             "family": "template family id; families starting with 'fam_heldout' appear only in test",
             "persona": "persona id; 'persona_heldout' appears only in test",
             "explicit_pref": "whether the context states an explicit preference",
-            "observed_ok": "whether the observed condition label matched the intended one (retain all rows; report yield)",
+            "observed_ok": "true/false when an observed condition label was assigned and matched/mismatched the intended one; null when no observed label was assigned (not a failed manipulation check). Retain all rows; report yield only over labelled rows.",
             "token_count": "prefix token count",
         },
         "data/splits.json": {"<group>": "split"},

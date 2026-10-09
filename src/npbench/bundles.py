@@ -133,7 +133,10 @@ def anonymize_stimulus(s: StimulusRecord) -> dict[str, Any]:
         "family": s.template_family_id,
         "persona": s.persona_id,
         "explicit_pref": s.preference_explicit,
-        "observed_ok": s.mode_observed_label.value == s.mode_intended.value,
+        # None when no observed-mode label was assigned (label "unknown"); False only for a labelled mismatch.
+        "observed_ok": (
+            None if s.mode_observed_label.value == "unknown" else s.mode_observed_label.value == s.mode_intended.value
+        ),
         "token_count": s.token_count,
     }
 

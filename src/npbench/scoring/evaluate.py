@@ -186,13 +186,16 @@ def evaluate_run(
                 ok = _within(
                     float(sub.estimate), float(rr["estimate"]), rr["tolerance_rel"], rr["tolerance_abs"]
                 )
-                alt = alternative_readings.get(rid)
-                if not ok and alt is not None and _within(
-                    float(sub.estimate), float(alt), rr["tolerance_rel"], rr["tolerance_abs"]
-                ):
+                alts = alternative_readings.get(rid) or []
+                alts = alts if isinstance(alts, list) else [alts]
+                hit = next(
+                    (a for a in alts if _within(float(sub.estimate), float(a), rr["tolerance_rel"], rr["tolerance_abs"])),
+                    None,
+                )
+                if not ok and hit is not None:
                     ok = True
                     n_alternative_accepted += 1
-                    entry["accepted_alternative_reading"] = alt
+                    entry["accepted_alternative_reading"] = hit
                 entry["within_tolerance"] = ok
                 if not ok:
                     sign_err = (float(sub.estimate) > 0) != (float(rr["estimate"]) > 0) and abs(

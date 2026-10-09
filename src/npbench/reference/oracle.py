@@ -266,7 +266,8 @@ def compute_reference(
 
         rand_dirs = sorted(k for k in by_dir if k.startswith(RANDOM_DIRECTION_PREFIX))
         rand_abs: dict[str, float] = {}
-        alternatives: dict[str, float] = extras.setdefault("alternative_readings", {})
+        # result_id -> list of accepted alternative estimates for ambiguous contract definitions
+        alternatives: dict[str, list[float]] = extras.setdefault("alternative_readings", {})
         a11_primary = float("nan")
         a11_alternative = float("nan")
         if rand_dirs:
@@ -290,9 +291,23 @@ def compute_reference(
                 rand_abs[g] = float(np.mean(vals))
             a11_primary = _a11_stat(groups_r)
             a11_alternative = float(np.mean(list(rand_abs.values()))) if rand_abs else float("nan")
+            # Third reading: only the random directions injected at the registered contrasts' norms
+            # ("same injected L2 magnitude as the registered directions"), group-mean-then-absolute.
+            reg_norms = {
+                round(float(np.mean([float(r["requested_norm"]) for r in by_dir[d] if float(r["alpha"]) != 0])), 3)
+                for d in dirs
+                if by_dir.get(d)
+            }
+            matched = [
+                rd
+                for rd in rand_dirs
+                if round(float(np.mean([float(r["requested_norm"]) for r in by_dir[rd] if float(r["alpha"]) != 0])), 3)
+                in reg_norms
+            ]
+            a11_matched = _a11_stat(groups_r, _dirs=matched) if matched else float("nan")
             lo, hi = _boot_ci(_a11_stat, groups_r, seed, n_boot)
             add("A11_random_control", a11_primary, lo, hi, n=len(groups_r))
-            alternatives["A11_random_control"] = a11_alternative
+            alternatives["A11_random_control"] = [v for v in (a11_alternative, a11_matched) if v == v]
         else:
             add("A11_random_control", None, applicable=False)
         for d in dirs:
@@ -347,7 +362,9 @@ def compute_reference(
                 lo, hi = _boot_ci(_a8_stat, groups, seed, n_boot)
                 add(f"A8_effect_minus_random[{d}]", est, lo, hi, n=len(groups))
                 a6_mean = float(np.mean([lik_slopes[g] for g in groups])) if groups else float("nan")
-                alternatives[f"A8_effect_minus_random[{d}]"] = float(abs(a6_mean) - a11_alternative)
+                alternatives[f"A8_effect_minus_random[{d}]"] = [
+                    float(abs(a6_mean) - v) for v in (a11_alternative, a11_matched) if v == v
+                ]
             else:
                 add(f"A8_effect_minus_random[{d}]", None, applicable=False)
             ratios = [
